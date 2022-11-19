@@ -35,7 +35,7 @@ class TestAugmention(unittest.TestCase):
 
     def test_mosaic(self):
         """ 测试马赛克图像增强 """
-        image, bbox, label = self.dataset.make_mosaic(0)
+        image, bbox, label = self.dataset.mosaicMaker(0)
         bbox *= image.shape[0]
         image = torch.from_numpy(image).permute(2, 0, 1)/255
         bbox = corner_to_center_numpy(bbox)

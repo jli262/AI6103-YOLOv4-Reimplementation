@@ -13,7 +13,7 @@ from utils.datetime_utils import time_delta
 from utils.lr_schedule_utils import WarmUpCosLRSchedule, determin_lr, get_lr
 from utils.optimizer_utils import make_optimizer
 
-from .dataset import VOCDataset, make_data_loader
+from .dataset import VOCDataset, dataLoader
 from .loss import YoloLoss
 from .yolo import Yolo
 
@@ -160,7 +160,7 @@ class TrainPipeline:
         # 数据集加载器
         self.num_worksers = num_workers
         self.n_batches = len(self.dataset)//bs
-        self.data_loader = make_data_loader(self.dataset, bs, num_workers)
+        self.data_loader = dataLoader(self.dataset, bs, num_workers)
 
         # 训练损失记录器
         self.logger = LossLogger(log_file, log_dir)
@@ -199,7 +199,7 @@ class TrainPipeline:
                 print('\n🧊 开始解冻训练！\n')
                 is_unfreezed = True
                 self.lr_schedule.set_lr(*determin_lr(self.lr, self.batch_size))
-                self.data_loader = make_data_loader(
+                self.data_loader = dataLoader(
                     self.dataset, self.batch_size, self.num_worksers)
                 self.n_batches = len(self.dataset)//self.batch_size
                 self.model.backbone.set_freezed(False)
