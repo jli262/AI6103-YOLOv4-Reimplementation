@@ -245,7 +245,7 @@ class TrainPipeline:
 
             # 关闭马赛克数据增强
             if e == self.max_epoch - self.lr_schedule.no_aug_epoch:
-                self.dataset.use_mosaic = False
+                self.dataset.ifMosaic = False
 
             # 定期保存模型
             if e > self.start_epoch and (e+1-self.start_epoch) % self.save_frequency == 0:

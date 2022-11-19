@@ -29,11 +29,11 @@ dataset = VOCDataset(
     root,
     'train',
     transformer=YoloAugmentation(config['image_size']),
-    colorTrans=ColorAugmentation(config['image_size']),
+    colorTransformer=ColorAugmentation(config['image_size']),
     keep_difficult=True,
     ifMosaic=True,
-    use_mixup=True,
-    image_size=config["image_size"]
+    ifMixup=True,
+    imageSize=config["image_size"]
 )
 
 if __name__ == '__main__':

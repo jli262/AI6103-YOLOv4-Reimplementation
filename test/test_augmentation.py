@@ -19,9 +19,9 @@ class TestAugmention(unittest.TestCase):
         self.dataset = VOCDataset(
             root,
             'trainval',
-            colorTrans=ColorAugmentation(),
+            colorTransformer=ColorAugmentation(),
             ifMosaic=True,
-            use_mixup=True
+            ifMixup=True
         )
 
     def test_voc_augmenter(self):

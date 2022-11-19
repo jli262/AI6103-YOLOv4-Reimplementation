@@ -21,8 +21,8 @@ class VOCDataset(Dataset):
     ]
 
     def __init__(self, root: Union[str, List[str]], image_set: Union[str, List[str]],
-                 transformer: Transformer = None, color_transformer: Transformer = None, keep_difficult=False,
-                 use_mosaic=False, use_mixup=False, image_size=416):
+                 transformer: Transformer = None, colorTransformer: Transformer = None, keep_difficult=False,
+                 ifMosaic=False, ifMixup=False, imageSize=416):
         
         super().__init__()
         
@@ -37,16 +37,16 @@ class VOCDataset(Dataset):
 
         self.root = root
         self.image_set = image_set
-        self.image_size = image_size
-        self.use_mosaic = use_mosaic
-        self.use_mixup = use_mixup
+        self.image_size = imageSize
+        self.ifMosaic = ifMosaic
+        self.use_mixup = ifMixup
 
         self.n_classes = len(self.VOC2007_classes)
         self.keep_difficult = keep_difficult
         self.class_to_index = {c: i for i, c in enumerate(self.VOC2007_classes)}
 
         self.transformer = transformer    # Data augmentation
-        self.color_transformer = color_transformer
+        self.color_transformer = colorTransformer
         self.annotation_reader = AnnotationReader(
             self.class_to_index, keep_difficult)
 
@@ -87,7 +87,7 @@ class VOCDataset(Dataset):
             标签数据，每一行格式为 `(cx, cy, w, h, class)`
         """
         # 50% 的概率进行马赛克数据增强
-        if self.use_mosaic and np.random.randint(2):
+        if self.ifMosaic and np.random.randint(2):
             image, bbox, label = self.make_mosaic(index)
 
             # mixup
