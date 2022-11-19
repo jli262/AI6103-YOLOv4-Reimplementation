@@ -1,63 +1,52 @@
 # coding:utf-8
 import json
-
 import numpy as np
 import matplotlib.pyplot as plt
-
 from .log_utils import LossLogger
 
 
-def plot_loss(log_file: str):
-    """ 绘制损失曲线
-
-    Parameters
-    ----------
-    log_file: str
-        损失日志文件路径
+def plot_loss(loss_file_path):
+    """ 
+        Para: loss file path
     """
-    logger = LossLogger(log_file)
-    epoch = np.arange(1, len(logger.losses)+1)
+    logg = LossLogger(loss_file_path)
+    epoch_all = np.arange(1, len(logg.losses)+1)
 
-    fig, ax = plt.subplots(1, 1, num='损失曲线')
-    ax.plot(epoch, logger.losses)
-    ax.set(xlabel='epoch', title='Total Loss', ylabel="loss")
+    plot_image, plots = plt.subplots(1, 1, num='Loss Curve')
+    plots.plot(epoch_all, logg.losses)
+    plots.set(xlabel='epoch', title='Total Loss', ylabel="loss")
 
-    return fig, ax
+    return plot_image, plots
 
 
-def plot_PR(file_path: str, class_name: str):
-    """ 绘制 PR 曲线
-
-    Parameters
-    ----------
-    file_path: str
-        由 eval.py 生成的测试结果文件路径
-
-    class_name: str
-        类别名
+def plot_PR(pr_file_path, classes_name):
+    """ 
+        Para: PR file path, class name
     """
-    with open(file_path, encoding='utf-8') as f:
-        result = json.load(f)[class_name]
+    with open(pr_file_path, encoding='utf-8') as file:
+        results = json.load(file)[classes_name]
 
-    fig, ax = plt.subplots(1, 1, num='PR 曲线')
-    ax.plot(result['recall'], result['precision'])
-    ax.set(xlabel='recall', ylabel='precision', title='PR curve')
-    return fig, ax
+    plot_image, plots = plt.subplots(1, 1, num='PR Curve')
+    plots.plot(results['recall'], results['precision'])
+    plots.set(xlabel='recall', ylabel='precision', title='PR curve')
+    return plot_image, plots
 
 
 def plot_AP(file_path: str):
-    """ 绘制 AP 柱状图 """
-    with open(file_path, encoding='utf-8') as f:
-        result = json.load(f)
+    """ 
+        Para: ap file path
+    """
+    with open(file_path, encoding='utf-8') as file:
+        results = json.load(file)
 
-    AP = []
-    classes = []
-    for k, v in result.items():
-        AP.append(v['AP'])
-        classes.append(k)
+    AP_list = []
+    class_list = []
+    for i, j in results.items():
+        AP_list.append(j['AP'])
+        class_list.append(i)
 
-    fig, ax = plt.subplots(1, 1, num='AP 柱状图')
-    ax.barh(range(len(AP)), AP, height=0.6, tick_label=classes)
-    ax.set(xlabel='AP')
+    plot_image, plots = plt.subplots(1, 1, num='AP Column')
+    plots.barh(range(len(AP_list)), AP_list, height=0.6, tick_label=class_list)
+    plots.set(xlabel='AP')
 
-    return fig, ax
+    return plot_image, plots
