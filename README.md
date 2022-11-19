@@ -99,13 +99,13 @@ The trained model on VOC2007 dataset and the mAP curse is shown in the figure be
 
 ## Detection
 
-1. Modify the `model_path` and `image_path` in `demo.py`.
+1. Modify the `model_path` and `image_path` in `test.py`.
 
 2. Display detection results:
 
    ```shell
    conda activate yolov4
-   python demo.py
+   python test.py
    ```
 
 ## Reference
