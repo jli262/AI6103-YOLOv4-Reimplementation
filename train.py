@@ -30,7 +30,7 @@ dataset = VOCDataset(
     'train',
     transformer=YoloAugmentation(config['image_size']),
     colorTransformer=ColorAugmentation(config['image_size']),
-    keep_difficult=True,
+    keepDifficult=True,
     ifMosaic=True,
     ifMixup=True,
     imageSize=config["image_size"]

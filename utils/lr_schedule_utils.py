@@ -3,13 +3,14 @@ from math import pi, cos
 
 
 class WarmUpCosLRSchedule:
-    self.lr = lr
-    self.min_lr = min_lr
-    self.optimizer = optimizer
-    self.warm_up_factor = warm_up_factor
-    self.total_epoch = total_epoch
-    self.warm_up_epoch = int(warm_up_ratio*total_epoch)
-    self.no_aug_epoch = int(no_aug_ratio*total_epoch)
+    def __init__(self, optimizer: Optimizer, lr: float, min_lr: float, total_epoch: int, warm_up_ratio=0.05, no_aug_ratio=0.05, warm_up_factor=1/3):
+        self.lr = lr
+        self.min_lr = min_lr
+        self.optimizer = optimizer
+        self.warm_up_factor = warm_up_factor
+        self.total_epoch = total_epoch
+        self.warm_up_epoch = int(warm_up_ratio*total_epoch)
+        self.no_aug_epoch = int(no_aug_ratio*total_epoch)
 
     def step(self, epoch: int):
         if epoch < self.warm_up_epoch:
