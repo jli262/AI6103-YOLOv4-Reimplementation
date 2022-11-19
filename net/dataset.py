@@ -1,6 +1,7 @@
 from os import path
 from typing import Dict, List, Tuple, Union
 from xml.etree import ElementTree as ET
+
 import random
 
 from utils.annotation_utils import AnnotationReader
@@ -229,6 +230,17 @@ class VOCDataset(Dataset):
         return image, bbox, label
 
 
+def dataLoader(dataset: VOCDataset, batch_size, num_workers=4, shuffle=True, drop_last=True, pin_memory=True):
+    return DataLoader(
+        dataset,
+        batch_size,
+        num_workers=num_workers,
+        shuffle=shuffle,
+        drop_last=drop_last,
+        pin_memory=pin_memory,
+        collate_fn=collateFn
+    )
+
 def collateFn(batch: List[Tuple[torch.Tensor, np.ndarray]]):
 
     images = []
@@ -242,14 +254,3 @@ def collateFn(batch: List[Tuple[torch.Tensor, np.ndarray]]):
 
     return torch.stack(images, 0), targets
 
-
-def dataLoader(dataset: VOCDataset, batch_size, num_workers=4, shuffle=True, drop_last=True, pin_memory=True):
-    return DataLoader(
-        dataset,
-        batch_size,
-        num_workers=num_workers,
-        shuffle=shuffle,
-        drop_last=drop_last,
-        pin_memory=pin_memory,
-        collate_fn=collateFn
-    )
