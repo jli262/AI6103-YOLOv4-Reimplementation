@@ -28,7 +28,7 @@ class TestAugmention(unittest.TestCase):
         """ 测试 VOC 图像增强器 """
         self.dataset.transformer = Compose(
             [YoloAugmentation(416), BBoxToAbsoluteCoords()])
-        self.dataset.color_transformer = Compose([
+        self.dataset.colorTransformer = Compose([
             ColorAugmentation(), BBoxToAbsoluteCoords()])
         image, target = self.dataset[4]
         self.draw(image, target)
