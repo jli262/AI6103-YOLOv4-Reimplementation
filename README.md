@@ -70,7 +70,7 @@ The trained model on VOC2007 dataset and the mAP curse is shown in the figure be
 
 ### best mAP
 
-![mAP](mAP.png)
+![mAP](map.png)
 
 ## Detection
 
