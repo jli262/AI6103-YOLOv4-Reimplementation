@@ -14,7 +14,7 @@ from utils.box_utils import corner_to_center_numpy
 
 
 class VOCDataset(Dataset):
-    """ VOC 数据集 """
+    """ VOC Dataset """
 
     classes = [
         'aeroplane', 'bicycle', 'bird', 'boat',
