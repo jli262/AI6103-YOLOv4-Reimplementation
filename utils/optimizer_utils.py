@@ -1,9 +1,7 @@
-# coding: utf-8
 from torch import optim, nn
 
 
 def make_optimizer(model: nn.Module, lr, momentum=0.9, weight_decay=5e-4):
-    """ 创建优化器 """
     pg0, pg1, pg2 = [], [], []
     for k, v in model.named_modules():
         if hasattr(v, "bias") and isinstance(v.bias, nn.Parameter):
