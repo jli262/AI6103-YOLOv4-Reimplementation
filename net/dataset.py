@@ -20,7 +20,7 @@ class VOCDataset(Dataset):
         'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair','cow', 'diningtable', 'dog', 'horse','motorbike', 'person', 'pottedplant','sheep', 'sofa', 'train', 'tvmonitor'
     ]
 
-    def __init__(self, root: Union[str, List[str]], image_set: Union[str, List[str]],
+    def __init__(self, root: Union[str, List[str]], imageSet: Union[str, List[str]],
                  transformer: Transformer = None, colorTransformer: Transformer = None, keep_difficult=False,
                  ifMosaic=False, ifMixup=False, imageSize=416):
         
@@ -29,46 +29,53 @@ class VOCDataset(Dataset):
         if isinstance(root, str):
             root = [root]
             
-        if isinstance(image_set, str):
-            image_set = [image_set]
+        if isinstance(imageSet, str):
+            imageSet = [imageSet]
             
-        if len(root) != len(image_set):
+        if len(root) != len(imageSet):
             raise ValueError("number `root` = number `image_set`")
 
         self.root = root
-        self.image_set = image_set
+        
+        self.image_set = imageSet
+        
         self.image_size = imageSize
+        
         self.ifMosaic = ifMosaic
-        self.use_mixup = ifMixup
+        
+        self.ifMixup = ifMixup
 
         self.n_classes = len(self.VOC2007_classes)
+        
         self.keep_difficult = keep_difficult
+        
         self.class_to_index = {c: i for i, c in enumerate(self.VOC2007_classes)}
 
         self.transformer = transformer    # Data augmentation
+        
         self.color_transformer = colorTransformer
-        self.annotation_reader = AnnotationReader(
-            self.class_to_index, keep_difficult)
+        
+        self.annotation_reader = AnnotationReader(self.class_to_index, keep_difficult)
 
         # Get all images and tag file paths in the specified dataset
-        self.image_names = []
-        self.image_paths = []
-        self.annotation_paths = []
+        self.imageNames = []
+        self.imagePaths = []
+        self.annotationPaths = []
 
-        for root, image_set in zip(self.root, self.image_set):
-            with open(path.join(root, f'ImageSets/Main/{image_set}.txt')) as f:
+        for root, imageSet in zip(self.root, self.image_set):
+            with open(path.join(root, f'ImageSets/Main/{imageSet}.txt')) as f:
                 for line in f.readlines():
                     line = line.strip()
                     if not line:
                         continue
-                    self.image_names.append(line)
-                    self.image_paths.append(
+                    self.imageNames.append(line)
+                    self.imagePaths.append(
                         path.join(root, f'JPEGImages/{line}.jpg'))
-                    self.annotation_paths.append(
+                    self.annotationPaths.append(
                         path.join(root, f'Annotations/{line}.xml'))
 
     def __len__(self):
-        return len(self.image_paths)
+        return len(self.imagePaths)
 
     def __getitem__(self, index: int):
         """ 获取样本
@@ -91,7 +98,7 @@ class VOCDataset(Dataset):
             image, bbox, label = self.make_mosaic(index)
 
             # mixup
-            if self.use_mixup and np.random.randint(2):
+            if self.ifMixup and np.random.randint(2):
                 index_ = np.random.randint(0, len(self))
                 image_, bbox_, label_ = self.make_mosaic(index_)
                 r = np.random.beta(8, 8)
@@ -120,7 +127,7 @@ class VOCDataset(Dataset):
     def make_mosaic(self, index: int):
         """ 创建马赛克增强后的图片 """
         # 随机选择三张图
-        indexes = list(range(len(self.image_paths)))
+        indexes = list(range(len(self.imagePaths)))
         choices = random.sample(indexes[:index]+indexes[index+1:], 3)
         choices.append(index)
 
@@ -217,9 +224,9 @@ class VOCDataset(Dataset):
             类别标签
         """
         image = cv.cvtColor(
-            cv.imread(self.image_paths[index]), cv.COLOR_BGR2RGB)
+            cv.imread(self.imagePaths[index]), cv.COLOR_BGR2RGB)
         target = np.array(self.annotation_reader.read(
-            self.annotation_paths[index]))
+            self.annotationPaths[index]))
         bbox, label = target[:, :4], target[:, 4]
         return image, bbox, label
 

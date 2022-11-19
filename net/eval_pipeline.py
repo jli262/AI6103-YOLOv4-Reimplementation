@@ -79,7 +79,7 @@ class EvalPipeline:
         transformer = ToTensor(self.image_size)
 
         print('🛸 正在预测中...')
-        for i, (image_path, image_name) in enumerate(zip(self.dataset.image_paths, self.dataset.image_names)):
+        for i, (image_path, image_name) in enumerate(zip(self.dataset.imagePaths, self.dataset.imageNames)):
             print(f'\r当前进度：{i/len(self.dataset):.0%}', end='')
 
             # 读入图片
@@ -117,7 +117,7 @@ class EvalPipeline:
         self.n_positives = {c: 0 for c in self.dataset.VOC2007_classes}
 
         print('\n\n🧩 正在获取标签中...')
-        for i, (anno_path, img_name) in enumerate(zip(self.dataset.annotation_paths, self.dataset.image_names)):
+        for i, (anno_path, img_name) in enumerate(zip(self.dataset.annotationPaths, self.dataset.imageNames)):
             print(f'\r当前进度：{i/len(self.dataset):.0%}', end='')
 
             root = ET.parse(anno_path).getroot()
