@@ -75,7 +75,7 @@ class EvalPipeline:
 
     def _predict(self):
         """ 预测每一种类存在于哪些图片中 """
-        self.preds = {c: {} for c in self.dataset.classes}
+        self.preds = {c: {} for c in self.dataset.VOC2007_classes}
         transformer = ToTensor(self.image_size)
 
         print('🛸 正在预测中...')
@@ -106,15 +106,15 @@ class EvalPipeline:
                 bbox = center_to_corner_numpy(bbox)
 
                 # 保存预测结果
-                self.preds[self.dataset.classes[c]][image_name] = {
+                self.preds[self.dataset.VOC2007_classes[c]][image_name] = {
                     "bbox": bbox.tolist(),
                     "conf": conf.tolist()
                 }
 
     def _get_ground_truth(self):
         """ 获取 ground truth 中每一种类存在于哪些图片中 """
-        self.ground_truths = {c: {} for c in self.dataset.classes}
-        self.n_positives = {c: 0 for c in self.dataset.classes}
+        self.ground_truths = {c: {} for c in self.dataset.VOC2007_classes}
+        self.n_positives = {c: 0 for c in self.dataset.VOC2007_classes}
 
         print('\n\n🧩 正在获取标签中...')
         for i, (anno_path, img_name) in enumerate(zip(self.dataset.annotation_paths, self.dataset.image_names)):
@@ -154,7 +154,7 @@ class EvalPipeline:
         print('\n\n🧪 正在计算 AP 中...')
         mAP = 0
         table = PrettyTable(["class", "AP"])
-        for c in self.dataset.classes:
+        for c in self.dataset.VOC2007_classes:
             ap, precision, recall = self._get_AP(c)
             result[c] = {
                 'AP': ap,
@@ -164,8 +164,8 @@ class EvalPipeline:
             mAP += ap
             table.add_row([c, f"{ap:.2%}"])
 
-        mAP /= len(self.dataset.classes)
-        table.add_column("mAP", [f"{mAP:.2%}"] + [""]*(len(self.dataset.classes)-1))
+        mAP /= len(self.dataset.VOC2007_classes)
+        table.add_column("mAP", [f"{mAP:.2%}"] + [""]*(len(self.dataset.VOC2007_classes)-1))
         print(table)
 
         # 保存评估结果

@@ -1,66 +1,39 @@
-# coding:utf-8
 from os import path
 from typing import Dict, List, Tuple, Union
 from xml.etree import ElementTree as ET
 import random
+from utils.annotation_utils import AnnotationReader
+from utils.box_utils import corner_to_center_numpy
+from utils.augmentation_utils import Transformer
 
 import cv2 as cv
 import numpy as np
+
 import torch
 from torch.utils.data import Dataset, DataLoader
-from utils.augmentation_utils import Transformer
-from utils.annotation_utils import AnnotationReader
-from utils.box_utils import corner_to_center_numpy
 
 
 class VOCDataset(Dataset):
-    """ VOC Dataset """
+    # VOC Dataset
 
-    classes = [
-        'aeroplane', 'bicycle', 'bird', 'boat',
-        'bottle', 'bus', 'car', 'cat', 'chair',
-        'cow', 'diningtable', 'dog', 'horse',
-        'motorbike', 'person', 'pottedplant',
-        'sheep', 'sofa', 'train', 'tvmonitor'
+    VOC2007_classes = [
+        'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair','cow', 'diningtable', 'dog', 'horse','motorbike', 'person', 'pottedplant','sheep', 'sofa', 'train', 'tvmonitor'
     ]
 
     def __init__(self, root: Union[str, List[str]], image_set: Union[str, List[str]],
                  transformer: Transformer = None, color_transformer: Transformer = None, keep_difficult=False,
                  use_mosaic=False, use_mixup=False, image_size=416):
-        """
-        Parameters
-        ----------
-        root: str or List[str]
-            数据集的根路径，下面必须有 `Annotations`、`ImageSets` 和 `JPEGImages` 文件夹
-
-        image_set: str or List[str]
-            数据集的种类，可以是 `train`、`val`、`trainval` 或者 `test`
-
-        transformer: Transformer
-            不使用马赛克增强时用的数据增强器
-
-        color_transformer: Transformer
-            使用马赛克增强时用的数据增强器
-
-        keep_difficulty: bool
-            是否保留 difficult 为 1 的样本
-
-        use_mosaic: bool
-            是否启用马赛克数据增强
-
-        use_mixup: bool
-            是否启用 mixup 数据增强，只在 `mosaic` 为 `True` 时起作用
-
-        image_size: int
-            数据集输出的图像大小
-        """
+        
         super().__init__()
+        
         if isinstance(root, str):
             root = [root]
+            
         if isinstance(image_set, str):
             image_set = [image_set]
+            
         if len(root) != len(image_set):
-            raise ValueError("`root` 和 `image_set` 的个数必须相同")
+            raise ValueError("number `root` = number `image_set`")
 
         self.root = root
         self.image_set = image_set
@@ -68,16 +41,16 @@ class VOCDataset(Dataset):
         self.use_mosaic = use_mosaic
         self.use_mixup = use_mixup
 
-        self.n_classes = len(self.classes)
+        self.n_classes = len(self.VOC2007_classes)
         self.keep_difficult = keep_difficult
-        self.class_to_index = {c: i for i, c in enumerate(self.classes)}
+        self.class_to_index = {c: i for i, c in enumerate(self.VOC2007_classes)}
 
-        self.transformer = transformer    # 数据增强器
+        self.transformer = transformer    # Data augmentation
         self.color_transformer = color_transformer
         self.annotation_reader = AnnotationReader(
             self.class_to_index, keep_difficult)
 
-        # 获取指定数据集中的所有图片和标签文件路径
+        # Get all images and tag file paths in the specified dataset
         self.image_names = []
         self.image_paths = []
         self.annotation_paths = []

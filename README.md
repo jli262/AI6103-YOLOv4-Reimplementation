@@ -70,32 +70,7 @@ The trained model on VOC2007 dataset and the mAP curse is shown in the figure be
 
 ### best mAP
 
-```
-+-------------+--------+--------+
-|    class    |   AP   |  mAP   |
-+-------------+--------+--------+
-|  aeroplane  | 88.87% | 82.92% |
-|   bicycle   | 90.69% |        |
-|     bird    | 85.72% |        |
-|     boat    | 66.17% |        |
-|    bottle   | 71.61% |        |
-|     bus     | 89.98% |        |
-|     car     | 92.20% |        |
-|     cat     | 91.61% |        |
-|    chair    | 66.64% |        |
-|     cow     | 91.90% |        |
-| diningtable | 80.29% |        |
-|     dog     | 89.20% |        |
-|    horse    | 90.04% |        |
-|  motorbike  | 88.59% |        |
-|    person   | 88.20% |        |
-| pottedplant | 51.06% |        |
-|    sheep    | 86.86% |        |
-|     sofa    | 75.07% |        |
-|    train    | 89.05% |        |
-|  tvmonitor  | 84.70% |        |
-+-------------+--------+--------+
-```
+![mAP](mAP.png)
 
 ## Detection
 
@@ -107,7 +82,3 @@ The trained model on VOC2007 dataset and the mAP curse is shown in the figure be
    conda activate yolov4
    python test.py
    ```
-
-## Reference
-
-- [[GitHub] bubbliiiing / yolov4-pytorch](https://github.com/zhiyiYo/yolov4)

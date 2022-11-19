@@ -5,7 +5,7 @@ from utils.augmentation_utils import YoloAugmentation, ColorAugmentation
 
 # train config
 config = {
-    "n_classes": len(VOCDataset.classes),
+    "n_classes": len(VOCDataset.VOC2007_classes),
     "image_size": 416,
     "anchors": [
         [[142, 110], [192, 243], [459, 401]],
@@ -29,9 +29,9 @@ dataset = VOCDataset(
     root,
     'train',
     transformer=YoloAugmentation(config['image_size']),
-    color_transformer=ColorAugmentation(config['image_size']),
+    colorTrans=ColorAugmentation(config['image_size']),
     keep_difficult=True,
-    use_mosaic=True,
+    ifMosaic=True,
     use_mixup=True,
     image_size=config["image_size"]
 )

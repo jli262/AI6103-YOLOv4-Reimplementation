@@ -19,8 +19,8 @@ class TestAugmention(unittest.TestCase):
         self.dataset = VOCDataset(
             root,
             'trainval',
-            color_transformer=ColorAugmentation(),
-            use_mosaic=True,
+            colorTrans=ColorAugmentation(),
+            ifMosaic=True,
             use_mixup=True
         )
 
@@ -45,7 +45,7 @@ class TestAugmention(unittest.TestCase):
     def draw(self, image: torch.Tensor, target):
         """ 绘制图像 """
         image = image.permute(1, 2, 0).numpy()*255
-        label = [self.dataset.classes[int(i)] for i in target[:, 4]]
+        label = [self.dataset.VOC2007_classes[int(i)] for i in target[:, 4]]
 
         # 绘制边界框和标签
         image = draw(image, target[:, :4], label)
