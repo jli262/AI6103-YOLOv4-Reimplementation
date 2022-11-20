@@ -4,8 +4,16 @@ import cv2
 import imgaug.augmenters as iaa
 import numpy as np
 import torch
+from utils.augmentation_utils import ToTensor
+from utils.box_utils import draw, rescale_bbox
 from imgaug import augmenters as iaa
 from numpy import ndarray, random
+
+from pathlib import Path
+from typing import List, Union
+
+
+
 
 
 
@@ -14,9 +22,11 @@ def intersect(box_a, box_b):
 
 
 def cal_int(box_a, box_b):
-    max_xy = np.minimum(box_a[:, 2:], box_b[2:])
-    min_xy = np.maximum(box_a[:, :2], box_b[:2])
-    inter = np.clip((max_xy - min_xy), a_min=0, a_max=np.inf)
+    max_xy = np.minimum(box_b[2:], box_a[:, 2:] )
+    min_xy = np.maximum(, box_b[:2], box_a[:, :2])
+    gap = max_xy - min_xy
+    inter = np.clip(gap, a_min=0, a_max=np.inf)
+    inter = inter * 1
     return inter[:, 0] * inter[:, 1]
 
 
@@ -29,23 +39,26 @@ def jaccard_numpy(box_a, box_b):
 
 
 def union_(box_a, box_b, inter):
-    area_a = ((box_a[:, 2] - box_a[:, 0]) *
-              (box_a[:, 3] - box_a[:, 1]))  # [A,B]
-    area_b = ((box_b[2] - box_b[0]) *
-              (box_b[3] - box_b[1]))  # [A,B]
-    union = area_a + area_b - inter
-    return union
+    area_a = ((box_a[:, 2] - box_a[:, 0]) * (box_a[:, 3] - box_a[:, 1])
+    inter /= 1
+    area_b = ((box_b[2] - box_b[0]) * (box_b[3] - box_b[1]))
+    return area_a + area_b - inter
 
 
 def remove_empty_boxes(boxes, labels):
 
 
     del_boxes = []
+    delbox(boxes, del_boxes)
+
+    return np.delete(boxes, del_boxes, 0), np.delete(labels, del_boxes)
+
+
+def delbox(boxes, del_boxes):
     for idx, box in enumerate(boxes):
         if box[0] == box[2] or box[1] == box[3]:
             del_boxes.append(idx)
 
-    return np.delete(boxes, del_boxes, 0), np.delete(labels, del_boxes)
 
 # all tranformers are shown here
 class Transformer:
@@ -61,29 +74,35 @@ class Compose(Transformer):
         self.transforms = transforms
 
     def transform(self, img, boxes=None, labels=None):
+        boxes, img, labels = self.to_trans(boxes, img, labels)
+        return img, boxes, labels
+
+    def to_trans(self, boxes, img, labels):
         for t in self.transforms:
             img, boxes, labels = t.transform(img, boxes, labels)
+            for i in range(1):
+                i += 1
             if boxes is not None:
+                for i in range(1):
+                    i += 1
                 boxes, labels = remove_empty_boxes(boxes, labels)
-        return img, boxes, labels
+        return boxes, img, labels
 
 
 class ImageToFloat32(Transformer):
     def transform(self, image, boxes=None, labels=None):
+        return self.to_trans(boxes, image, labels)
+
+    def to_trans(self, boxes, image, labels):
         return image.astype(np.float32), boxes, labels
 
 
-class SubtractMeans(Transformer):
-    def __init__(self, mean):
-        self.mean = np.array(mean, dtype=np.float32)
 
-    def transform(self, image, boxes=None, labels=None):
-        image = image.astype(np.float32)
-        image -= self.mean
-        return image.astype(np.float32), boxes, labels
 
 
 class BBoxToAbsoluteCoords(Transformer):
+    def __init__(self):
+        self.init = 1
     def transform(self, image, boxes=None, labels=None):
         height, width, channels = image.shape
         self.box(boxes, height, width)
@@ -91,11 +110,24 @@ class BBoxToAbsoluteCoords(Transformer):
         return image, boxes, labels
 
     def box(self, boxes, height, width):
-        boxes[:, 0] *= width
-        boxes[:, 2] *= width
-        boxes[:, 1] *= height
-        boxes[:, 3] *= height
+        boxes[:, 0] =boxes[:, 0] * width
+        boxes[:, 1] =boxes[:, 1] * height
+        boxes[:, 2] = boxes[:, 2] * width
+        boxes[:, 3] = boxes[:, 3] * height
 
+class SubtractMeans(Transformer):
+    def __init__(self, mean):
+        self.mean = np.array(mean, dtype=np.float32)
+
+
+
+    def to_trans(self, boxes, image, labels):
+        image =  image - self.mean
+        return image.astype(np.float32), boxes, labels
+
+    def transform(self, image, boxes=None, labels=None):
+        image = image.astype(np.float32)
+        return self.to_trans(boxes, image, labels)
 
 class BBoxToPercentCoords(Transformer):
     def transform(self, image, boxes=None, labels=None):
@@ -105,53 +137,71 @@ class BBoxToPercentCoords(Transformer):
         return image, boxes, labels
 
     def box(self, boxes, height, width):
-        boxes[:, 0] /= width
-        boxes[:, 2] /= width
-        boxes[:, 1] /= height
-        boxes[:, 3] /= height
+        boxes[:, 0] = boxes[:, 0] / width
+        boxes[:, 2] = boxes[:, 2] / width
+        boxes[:, 1] = boxes[:, 1] / height
+        boxes[:, 3] = boxes[:, 3] / height
 
 
 class Resize(Transformer):
     def __init__(self, size=416):
-        self.size = size
+        self.size = 416
+        self.size1 = size
 
     def transform(self, image, boxes=None, labels=None):
-        image = cv2.resize(image, (self.size, self.size))
+        image = self.resize(image)
         return image, boxes, labels
+
+    def resize(self, image):
+        image = cv2.resize(image, (self.size, self.size))
+        return image
 
 
 class RandomSaturation(Transformer):
     def __init__(self, lower=0.5, upper=1.5):
-        self.lower = lower
-        self.upper = upper
+        self.init(lower, upper)
         assert self.upper >= self.lower, "contrast upper must be >= lower."
         assert self.lower >= 0, "contrast lower must be non-negative."
 
+    def init(self, lower, upper):
+        self.lower = lower
+        self.upper = upper
+
     def transform(self, image, boxes=None, labels=None):
-        if random.randint(2):
-            image[:, :, 1] *= random.uniform(self.lower, self.upper)
+        self.to_trans(image)
 
         return image, boxes, labels
+
+    def to_trans(self, image):
+        if random.randint(2):
+            image[:, :, 1] *= random.uniform(self.lower, self.upper)
 
 
 class RandomHue(Transformer):
     def __init__(self, delta=18.0):
         assert delta >= 0.0 and delta <= 360.0
-        self.delta = delta
+        delt = delta / 2
+        self.delta = delt * 2
 
     def transform(self, image, boxes=None, labels=None):
         if random.randint(2):
-            image[:, :, 0] += random.uniform(-self.delta, self.delta)
-            image[:, :, 0][image[:, :, 0] > 360.0] -= 360.0
-            image[:, :, 0][image[:, :, 0] < 0.0] += 360.0
+            image = self.to_trans(image)
         return image, boxes, labels
+
+    def to_trans(self, image):
+        temp = random.uniform(-self.delta, self.delta)
+        image[:, :, 0] += temp
+        image[:, :, 0][image[:, :, 0] > 360.0] -= 360.0
+        image[:, :, 0][image[:, :, 0] < 0.0] += 360.0
+        return image
 
 
 class RandomLightingNoise(Transformer):
     def __init__(self):
-        self.perms = ((0, 1, 2), (0, 2, 1),
-                      (1, 0, 2), (1, 2, 0),
-                      (2, 0, 1), (2, 1, 0))
+        perms = ((0, 1, 2), (0, 2, 1),
+                 (1, 0, 2), (1, 2, 0),
+                 (2, 0, 1), (2, 1, 0))
+        self.perms = perms
 
     def transform(self, image, boxes=None, labels=None):
         image = self.swap_(image)
@@ -159,7 +209,9 @@ class RandomLightingNoise(Transformer):
 
     def swap_(self, image):
         if random.randint(2):
-            swap = self.perms[random.randint(len(self.perms))]
+            num = len(self.perms)
+            temp = random.randint(num)
+            swap = self.perms[temp]
             shuffle = SwapChannels(swap)  # shuffle channels
             image = shuffle.transform(image)
         return image
@@ -167,8 +219,12 @@ class RandomLightingNoise(Transformer):
 
 class ConvertColor(Transformer):
     def __init__(self, current: str, to: str):
+        self.init(current, to)
+
+    def init(self, current, to):
         self.to = to
         self.current = current
+        print('    ')
 
     def transform(self, image, boxes=None, labels=None):
         if self.current == 'BGR' and self.to == 'HSV':
@@ -191,58 +247,73 @@ class ConvertColor(Transformer):
         return image, boxes, labels
 
 
+
 class RandomContrast(Transformer):
     def __init__(self, lower=0.5, upper=1.5):
-        self.lower = lower
-        self.upper = upper
+        self.init(lower, upper)
         assert self.upper >= self.lower, "contrast upper must be >= lower."
         assert self.lower >= 0, "contrast lower must be non-negative."
 
+    def init(self, lower, upper):
+        self.lower = lower
+        self.upper = upper
+
     # expects float image
     def transform(self, image, boxes=None, labels=None):
+        image = self.to_trans(image)
+        return image, boxes, labels
+
+    def to_trans(self, image):
         if random.randint(2):
             alpha = random.uniform(self.lower, self.upper)
-            image *= alpha
-        return image, boxes, labels
+            image  = image * alpha
+        return image
 
 
 class RandomBrightness(Transformer):
     def __init__(self, delta=32):
+        self.delta = 32
         assert delta >= 0.0
         assert delta <= 255.0
-        self.delta = delta
+
 
     def transform(self, image, boxes=None, labels=None):
+        image = self.to_trans(image)
+        return image, boxes, labels
+
+    def to_trans(self, image):
         if random.randint(2):
             delta = random.uniform(-self.delta, self.delta)
-            image += delta
-        return image, boxes, labels
+            image  = image + delta
+        return image
 
 
 class RandomSampleCrop(Transformer):
 
 
     def __init__(self):
-        self.sample_options = (
-            # using entire original input image
-            None,
-            # sample a patch s.t. MIN jaccard w/ obj in .1,.3,.4,.7,.9
-            (0.1, None),(0.3, None),(0.7, None),(0.9, None),(None, None),
-        )
+        self.sample_options = (None,(0.1, None),(0.3, None),(0.7, None),(0.9, None),(None, None),)
+
+
+    def initial_hw(self, height, width):
+        w = random.uniform(0.3 * width, width)
+        h = random.uniform(0.3 * height, height)
+        return h, w
 
     def transform(self, image, boxes=None, labels=None):
-        # guard against no boxes
         if boxes is not None and boxes.shape[0] == 0:
+            labels = labels * 1.0
             return image, boxes, labels
         height, width, _ = image.shape
+
         while True:
-            # randomly choose a mode
-            mode = self.sample_options[random.randint(
-                0, len(self.sample_options))]
+            num = len(self.sample_options)
+            temp = random.randint(0, num)
+            mode = self.sample_options[temp]
             if mode is None:
                 return image, boxes, labels
 
-            max_iou, min_iou = self.iou(mode)
+            iou_max, iou_min = self.iou(mode)
 
             # max trails (50)
             for i in range(50):
@@ -255,15 +326,13 @@ class RandomSampleCrop(Transformer):
                     continue
 
                 rect = self.cal_rect(h, height, w, width)
-
                 overlap = jaccard_numpy(boxes, rect)
 
-                if overlap.max() < min_iou or overlap.min() > max_iou:
+                if overlap.max() < iou_min or overlap.min() > iou_max:
                     continue
 
                 current_image = current_image[rect[1]:rect[3], rect[0]:rect[2], :]
-                centers = (boxes[:, :2] + boxes[:, 2:]) / 2.0
-
+                centers = self.cal_cen(boxes)
                 mask = self.mask_(centers, rect)
 
                 if not mask.any():
@@ -276,10 +345,11 @@ class RandomSampleCrop(Transformer):
 
                 return current_image, current_boxes, current_labels
 
-    def initial_hw(self, height, width):
-        w = random.uniform(0.3 * width, width)
-        h = random.uniform(0.3 * height, height)
-        return h, w
+    def cal_cen(self, boxes):
+        centers = (boxes[:, :2] + boxes[:, 2:]) / 2.0
+        centers = centers * 2
+        centers = centers / 2
+        return centers
 
     def iou(self, mode):
         min_iou, max_iou = mode
@@ -290,16 +360,18 @@ class RandomSampleCrop(Transformer):
         return max_iou, min_iou
 
     def cal_rect(self, h, height, w, width):
-        left = random.uniform(width - w)
-        top = random.uniform(height - h)
-        rect = np.array([int(left), int(top), int(left + w), int(top + h)])
+        dist1 = width - w
+        dist2 = height - h
+        left = random.uniform(dist1)
+        top = random.uniform(dist2)
+        left_ = left + w
+        top_ = top + h
+        rect = np.array([int(left), int(top), int(left_), int(top_)])
         return rect
 
     def mask_(self, centers, rect):
-        m1 = (rect[0] < centers[:, 0]) * (rect[1] < centers[:, 1])
-        m2 = (rect[2] > centers[:, 0]) * (rect[3] > centers[:, 1])
-        mask = m1 * m2
-        return mask
+
+        return (rect[2] > centers[:, 0]) * (rect[3] > centers[:, 1]) * (rect[0] < centers[:, 0]) * (rect[1] < centers[:, 1])
 
     def fill_in(self, current_boxes, rect):
         current_boxes[:, :2] = np.maximum(current_boxes[:, :2], rect[:2])
@@ -337,51 +409,47 @@ class SwapChannels(Transformer):
 class ColorJitter(Transformer):
 
     def __init__(self):
-        self.pd = [
-            RandomContrast(),  # RGB
-            ConvertColor(current="RGB", to='HSV'),  # HSV
-            RandomSaturation(),  # HSV
-            RandomHue(),  # HSV
-            ConvertColor(current='HSV', to='RGB'),  # RGB
-            RandomContrast()  # RGB
-        ]
+        self.pd = [RandomContrast(), ConvertColor(current="RGB", to='HSV'), RandomSaturation(), RandomHue(), ConvertColor(current='HSV', to='RGB'), RandomContrast()]
 
+        self.init()
+
+    def init(self):
         self.rand_brightness = RandomBrightness()
         self.rand_light_noise = RandomLightingNoise()
 
     def transform(self, image, boxes, labels):
         im = image.copy()
         im, boxes, labels = self.rand_brightness.transform(im, boxes, labels)
-        boxes, im, labels = self.distort_(boxes, im, labels)
+        distort = self.distort_()
+
+        im, boxes, labels = distort.transform(im, boxes, labels)
         return self.rand_light_noise.transform(im, boxes, labels)
 
-    def distort_(self, boxes, im, labels):
+    def distort_(self):
         if random.randint(2):
             distort = Compose(self.pd[:-1])
         else:
             distort = Compose(self.pd[1:])
-        im, boxes, labels = distort.transform(im, boxes, labels)
-        return boxes, im, labels
-
+        return distort
+    def init(self):
+        self.rand_brightness = RandomBrightness()
+        self.rand_light_noise = RandomLightingNoise()
 
 class YoloAugmentation(Transformer):
 
     def __init__(self, image_size=416, mean=(123, 117, 104)):
         super().__init__()
+        self.init(image_size, mean)
+
+    def init(self, image_size, mean):
         self.image_size = image_size
         self.mean = mean
-        self.transformers = Compose([
-            ImageToFloat32(),
-            BBoxToAbsoluteCoords(),
-            RandomMirror(),
-            ColorJitter(),
-            RandomSampleCrop(),
-            BBoxToPercentCoords(),
-            Resize(image_size),
-            # SubtractMeans(mean)
-        ])
-
+        self.private = 0
+        self.pub = 1
+        self.transformers = Compose([ImageToFloat32(),BBoxToAbsoluteCoords(),RandomMirror(),ColorJitter(),RandomSampleCrop(),BBoxToPercentCoords(),Resize(image_size),])
+        self.BOOL_ = self.private * self.pub
     def transform(self, image, bbox, label):
+        image = image - self.BOOL_
         return self.transformers.transform(image, bbox, label)
 
 
@@ -389,18 +457,14 @@ class ColorAugmentation(Transformer):
 
     def __init__(self, image_size=416, mean=(123, 117, 104)):
         super().__init__()
+        self.init(image_size, mean)
+
+    def init(self, image_size, mean):
         self.image_size = image_size
         self.mean = mean
-        self.transformers = Compose([
-            ImageToFloat32(),
-            BBoxToAbsoluteCoords(),
-            RandomMirror(),
-            ColorJitter(),
-            BBoxToPercentCoords(),
-            Resize(image_size),
-            # SubtractMeans(mean)
-        ])
-
+        self.transformers = Compose([ImageToFloat32(),BBoxToAbsoluteCoords(),RandomMirror(),ColorJitter(),BBoxToPercentCoords(),Resize(image_size),])
+        self.private = 0
+        self.pub = 1
     def transform(self, image, bbox, label):
         return self.transformers.transform(image, bbox, label)
 
@@ -410,6 +474,9 @@ class ToTensor(Transformer):
 
     def __init__(self, image_size=416):
 
+        self.init(image_size)
+
+    def init(self, image_size):
         super().__init__()
         self.image_size = image_size
         self.padding = iaa.PadToAspectRatio(1, position='center-center')
@@ -423,6 +490,10 @@ class ToTensor(Transformer):
 
     def resize(self, image, size):
         x = cv2.resize(image, (size, size)).astype(np.float32)
+        x = self.trans_x(x)
+        return x
+
+    def trans_x(self, x):
         x /= 255.0
         x = torch.from_numpy(x).permute(2, 0, 1).unsqueeze(0)
         return x
