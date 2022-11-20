@@ -63,4 +63,4 @@ The trained model on VOC2007 dataset and the mAP curse is shown in the figure be
 
 ## Detection Image
 
-![Detection Image](result sample1.png)
+![Detection Image](resultSample1.png)
