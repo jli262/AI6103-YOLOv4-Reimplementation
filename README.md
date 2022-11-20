@@ -53,7 +53,7 @@ python evals.py
 
 ### mAP curve
 
-The trained model on VOC2007 dataset and the mAP curse is shown in the figure below:
+The trained model on VOC2007 dataset and the mAP curse is shown in the figure below (May Modify the `model_path` and `image_path`in evals.py first):
 
 ![mAP Curve](mAP_Curve.png)
 
@@ -84,13 +84,6 @@ The trained model on VOC2007 dataset and the mAP curse is shown in the figure be
 
 
 
-## Detection
+## Detection Image
 
-1. Modify the `model_path` and `image_path` in `test.py`.
-
-2. Display detection results:
-
-   ```shell
-   conda activate yolov4
-   python test.py
-   ```
+![Detection Image](resultSample1.png)
