@@ -17,9 +17,9 @@ config = {
     "batch_size": 4,
     "freeze_batch_size": 8,
     "freeze": True,
-    "freeze_epoch": 50,
+    "freeze_epoch": 0,
     "max_epoch": 200,
-    "start_epoch": 0,
+    "start_epoch": 50,
     "num_workers": 4
 }
 
