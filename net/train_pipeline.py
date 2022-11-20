@@ -1,23 +1,18 @@
 # coding:utf-8
 import time
-
 import torch
-from torch import cuda
+from torch import cuda, optim, nn
 from torch.backends import cudnn
-
 from .dataset import VOCDataset, dataLoader
+from utils.log_utils import LossLogger, Logger
 from .loss import YoloLoss
 from .yolo import Yolo
-
 import numpy as np
-from utils.log_utils import LossLogger, Logger
-from utils.datetime_utils import time_delta
 from utils.lr_schedule_utils import WarmUpCosLRSchedule, determin_lr, get_lr
-from utils.optimizer_utils import make_optimizer
-
 from tqdm import tqdm
 from pathlib import Path
 from datetime import datetime
+
 
 def exception_handler(train_func):
     def wrapper(train_pipeline, *args, **kwargs):
@@ -40,12 +35,54 @@ def exception_handler(train_func):
     return wrapper
 
 
-class TrainPipeline:
-    def __init__(self, n_classes: int, image_size: int, anchors: list, dataset: VOCDataset, darknet_path: str = None,yolo_path: str = None, lr=0.01, momentum=0.9, weight_decay=4e-5, warm_up_ratio=0.02, freeze=True,batch_size=4, freeze_batch_size=8, num_workers=4, freeze_epoch=20, start_epoch=0, max_epoch=60,save_frequency=5, use_gpu=True, save_dir='model', log_file: str = None, log_dir='log'):
+def time_delta(t: datetime):
+    times = datetime.now() - t
+    seconds = times.seconds % 60
+    hours = times.seconds // 3600
+    minutes = (times.seconds - times.seconds // 3600 * 3600) // 60
+    return f'{hours:02}:{minutes:02}:{seconds:02}'
 
+
+def make_optimizer(model: nn.Module, lr, momentum=0.9, weight_decay=5e-4):
+    pg0, pg1, pg2 = [], [], []
+    for k, v in model.named_modules():
+        setBiasApp(pg2, v)
+        setWeightApp(k, pg0, pg1, v)
+
+    optimizer = optim.SGD(pg0, lr, momentum=momentum, nesterov=True)
+    setPara(optimizer, pg1, pg2, weight_decay)
+    return optimizer
+
+
+def setPara(optimizer, pg1, pg2, weight_decay):
+    optimizer.add_param_group({"params": pg2})
+    optimizer.add_param_group({"params": pg1, "weight_decay": weight_decay})
+
+
+def setBiasApp(pg2, v):
+    if hasattr(v, "bias") and isinstance(v.bias, nn.Parameter):
+        pg2.append(v.bias)
+
+
+def setWeightApp(k, pg0, pg1, v):
+    if isinstance(v, nn.BatchNorm2d) or "bn" in k:
+        pg0.append(v.weight)
+    elif hasattr(v, "weight") and isinstance(v.weight, nn.Parameter):
+        pg1.append(v.weight)
+
+
+class TrainPipeline:
+    def __init__(self, n_classes: int, image_size: int, anchors: list, dataset: VOCDataset, darknet_path: str = None,
+                 yolo_path: str = None, lr=0.01, momentum=0.9, weight_decay=4e-5, warm_up_ratio=0.02, freeze=True,
+                 batch_size=4, freeze_batch_size=8, num_workers=4, freeze_epoch=20, start_epoch=0, max_epoch=60):
+
+        save_frequency = 5
+        save_dir = 'model'
+        log_file: str = None
+        log_dir = 'log'
         self.setDataset(dataset)
         self.setSaveDir(save_dir)
-        self.setGpu(use_gpu)
+        self.setGPUDevice()
         self.setSaveFreq(save_frequency)
         self.setFBS(freeze_batch_size)
         self.setBatchSize(batch_size)
@@ -57,12 +94,8 @@ class TrainPipeline:
         self.setCEpoch(start_epoch)
         self.setFEpoch(freeze_epoch)
 
-        self.setGPUDevice(use_gpu)
-
         self.setModel(anchors, image_size, n_classes)
-
         self.setPrint(darknet_path, yolo_path)
-
         self.model.backbone.set_freezed(freeze)
 
         bs = self.setOptiandLoss(anchors, batch_size, freeze, freeze_batch_size, image_size, lr, max_epoch, momentum,
@@ -86,7 +119,8 @@ class TrainPipeline:
     def setBatchNum(self, bs):
         self.n_batches = len(self.dataset) // bs
 
-    def setOptiandLoss(self, anchors, batch_size, freeze, freeze_batch_size, image_size, lr, max_epoch, momentum, n_classes, warm_up_ratio, weight_decay):
+    def setOptiandLoss(self, anchors, batch_size, freeze, freeze_batch_size, image_size, lr, max_epoch, momentum,
+                       n_classes, warm_up_ratio, weight_decay):
         bs = self.setbs(batch_size, freeze, freeze_batch_size)
         lr_fit, lr_min_fit = determin_lr(lr, bs)
         self.setCriterion(anchors, image_size, n_classes)
@@ -108,24 +142,20 @@ class TrainPipeline:
         return bs
 
     def setPrint(self, darknet_path, yolo_path):
+        if darknet_path:
+            self.model.backbone.load(darknet_path)
+            print('Successfully loading Darknet53：' + darknet_path)
         if yolo_path:
             self.model.load(yolo_path)
             print('Successfully loading YOLO：' + yolo_path)
-        elif darknet_path:
-            self.model.backbone.load(darknet_path)
-            print('Successfully loading Darknet53：' + darknet_path)
-        else:
-            raise ValueError("Wrong Darknet53 path")
 
     def setModel(self, anchors, image_size, n_classes):
         self.model = Yolo(n_classes, image_size, anchors).to(self.device)
 
-    def setGPUDevice(self, use_gpu):
-        if use_gpu and cuda.is_available():
-            self.device = torch.device('cuda')
-            cudnn.benchmark = True
-        else:
-            self.device = torch.device('cpu')
+    def setGPUDevice(self):
+
+        self.device = torch.device('cuda')
+
 
     def setFEpoch(self, freeze_epoch):
         self.free_epoch = freeze_epoch
@@ -153,9 +183,6 @@ class TrainPipeline:
 
     def setSaveFreq(self, save_frequency):
         self.save_frequency = save_frequency
-
-    def setGpu(self, use_gpu):
-        self.use_gpu = use_gpu
 
     def setSaveDir(self, save_dir):
         self.save_dir = Path(save_dir)
@@ -235,7 +262,6 @@ class TrainPipeline:
     def trainPred(self, start_time):
         loss_value = 0
         for iter, (images, targets) in enumerate(self.data_loader, 1):
-
             preds = self.getPreds(images)
 
             loss = self.doBackward(preds, targets)
@@ -280,12 +306,14 @@ class TrainPipeline:
 
     def freezeMethod(self, e, is_unfreezed):
         if self.freeze and e >= self.free_epoch and not is_unfreezed:
-            print('\nFreeze begins！\n')
-            is_unfreezed = True
-            self.lr_schedule.set_lr(*determin_lr(self.lr, self.batch_size))
-            self.data_loader = dataLoader(self.dataset, self.batch_size, self.num_worksers)
+            print('\nFreeze begins: \n')
+            self.setLrDl()
             self.calBatchSize()
             self.model.backbone.set_freezed(False)
+
+    def setLrDl(self):
+        self.data_loader = dataLoader(self.dataset, self.batch_size, self.num_worksers)
+        self.lr_schedule.set_lr(*determin_lr(self.lr, self.batch_size))
 
     def calBatchSize(self):
         self.n_batches = len(self.dataset) // self.batch_size

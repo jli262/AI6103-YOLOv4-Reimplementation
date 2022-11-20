@@ -44,17 +44,6 @@ AI6103 Group Project - Reimplementation of YOLOv4 object detection
 
 ## Evaluation
 
-### one model
-
-Calculate mAP:
-
-```sh
-conda activate yolov4
-python eval.py
-```
-
-### multi models
-
 Calculate and plot mAP:
 
 ```shell

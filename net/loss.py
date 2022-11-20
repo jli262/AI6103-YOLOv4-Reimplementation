@@ -59,20 +59,14 @@ class YoloLoss(nn.Module):
 
         loss = 0
         N, _, h, w = pred.shape
-
-
-        anchor_mask = list(
-            range(index*self.n_anchors, (index+1)*self.n_anchors))
-        pred = decode(pred, self.anchors[anchor_mask],
-                      self.n_classes, self.image_size)
+        anchor_mask = list(range(index*self.n_anchors, (index+1)*self.n_anchors))
+        pred = self.decoding(anchor_mask, pred)
 
         step_h = self.calculateHW(h)
         step_w = self.calculateHW(w)
 
         anchors = [[i/step_w, j/step_h] for i, j in self.anchors]
-        p_mask, n_mask, gt = match(
-            anchors, anchor_mask, targets, h, w, self.n_classes, self.overlap_thresh)
-        self.mark_ignore(pred, targets, n_mask)
+        gt, n_mask, p_mask = self.matching(anchor_mask, anchors, h, pred, targets, w)
 
         p_mask = self.setDevice(p_mask, pred)
         n_mask = self.setDevice(n_mask, pred)
@@ -80,9 +74,7 @@ class YoloLoss(nn.Module):
 
         m = p_mask == 1
         if m.sum() != 0:
-
-            iou = ciou(pred[..., :4], gt[..., :4])
-            m &= torch.logical_not(torch.isnan(iou))
+            iou, m = self.setIou(gt, m, pred)
             loss = self.calculateLoss1(iou, loss, m)
 
             loss = self.calculateLoss2(gt, loss, m, pred)
@@ -92,13 +84,28 @@ class YoloLoss(nn.Module):
 
         return loss
 
+    def setIou(self, gt, m, pred):
+        iou = ciou(pred[..., :4], gt[..., :4])
+        m &= torch.logical_not(torch.isnan(iou))
+        return iou, m
+
+    def matching(self, anchor_mask, anchors, h, pred, targets, w):
+        p_mask, n_mask, gt = match(anchors, anchor_mask, targets, h, w, self.n_classes, self.overlap_thresh)
+        self.mark_ignore(pred, targets, n_mask)
+        return gt, n_mask, p_mask
+
+    def decoding(self, anchor_mask, pred):
+        pred = decode(pred, self.anchors[anchor_mask], self.n_classes, self.image_size)
+        return pred
+
     def calculateLoss3(self, index, loss, m, mask, pred):
-        loss += self.bce_loss(pred[..., 4] * mask, m.type_as(pred) * mask) * \
-                self.lambda_obj * self.balances[index]
+        product = self.lambda_obj * self.balances[index]
+        loss += self.bce_loss(pred[..., 4] * mask, m.type_as(pred) * mask) * product
         return loss
 
     def calculateLoss2(self, gt, loss, m, pred):
-        loss += self.bce_loss(pred[..., 5:][m], gt[..., 5:][m]) * self.lambda_cls
+        product = self.lambda_cls
+        loss += self.bce_loss(pred[..., 5:][m], gt[..., 5:][m]) * product
         return loss
 
     def calculateLoss1(self, iou, loss, m):
@@ -112,6 +119,12 @@ class YoloLoss(nn.Module):
     def calculateHW(self, x):
         step_x = self.image_size / x
         return step_x
+
+    def setT2(self, h, i, target, targets):
+        target[:, [1, 3]] = targets[i][:, [1, 3]] * h
+
+    def setT1(self, i, target, targets, w):
+        target[:, [0, 2]] = targets[i][:, [0, 2]] * w
 
     def mark_ignore(self, pred: Tensor, targets: List[Tensor], n_mask: Tensor):
 
@@ -135,8 +148,8 @@ class YoloLoss(nn.Module):
 
     def calculateTarget(self, h, i, targets, w):
         target = torch.zeros_like(targets[i][..., :4])
-        target[:, [0, 2]] = targets[i][:, [0, 2]] * w
-        target[:, [1, 3]] = targets[i][:, [1, 3]] * h
+        self.setT1(i, target, targets, w)
+        self.setT2(h, i, target, targets)
         return target
 
     def setBox(self, bbox, i):

@@ -15,7 +15,7 @@ def image_detect(model_path: str, image_path: str, classes: List[str], image_siz
     model.load(model_path)
     model.eval()
 
-    return model.detect(image_path, classes, use_gpu, show_conf)
+    return model.detect(image_path, classes,  show_conf)
 
 
 def camera_detect(model_path: str, classes: List[str], image_size: int = 416, anchors: list = None,

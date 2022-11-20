@@ -216,7 +216,7 @@ class SPPBlock(nn.Module):
         # Mlist = {}
         # for size in sizes:
         #     Mlist = nn.MaxPool2d(size, 1, size // 2)
-        self.maxpools = nn.ModuleList([nn.MaxPool2d(size, 1, size // 2) for size in sizes])
+        self.maxpools = nn.ModuleList([nn.MaxPool2d(size, 1, size//2) for size in sizes])
 
     def forward(self, x):
         if self.getX1(x):
@@ -463,9 +463,10 @@ class Yolo(nn.Module):
         return image
 
     def boxPred(self, classes, h, w, y):
-        bbox, conf, label = [], [], []
+        bbox, conf, label = [],[],[]
         for c, pred in y[0].items():
-            pred = self.calcPred(bbox, h, pred, w)
+            boxes = rescale_bbox(pred[:, 1:], self.image_size, h, w)
+            bbox.append(boxes)
             conf.extend(pred[:, 0].tolist())
             label.extend([classes[c]] * pred.shape[0])
         return bbox, conf, label

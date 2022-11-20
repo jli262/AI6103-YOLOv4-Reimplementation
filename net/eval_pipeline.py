@@ -15,23 +15,22 @@ import torch
 from torch import cuda
 
 class EvalPipeline:
-    def __init__(self, model_path: str, dataset: VOCDataset, image_size=416, anchors: list = None, conf_thresh=0.05, overlap_thresh=0.5, save_dir='eval', use_07_metric=False, use_gpu=True):
-        self.setGpu(use_gpu)
+    def __init__(self, model_path: str, dataset: VOCDataset, image_size=416, anchors: list = None, conf_thresh=0.05, overlap_thresh=0.5, save_dir='eval', use_07_metric=False):
+        self.setDevice()
+
         self.setDataset(dataset)
         self.setImageSize(image_size)
         self.setConfThresh(conf_thresh)
+
         self.setOverlapThresh(overlap_thresh)
         self.set07Metric(use_07_metric)
         self.setSaveDir(save_dir)
-
         self.setModelPath(model_path)
-        self.setDevice(use_gpu)
         self.setModel(anchors, image_size)
         self.setDConfThresh(conf_thresh)
         self.setModelDevice()
         self.setModelLoad(model_path)
         self.model.eval()
-
     def setModelLoad(self, model_path):
         self.model.load(model_path)
 
@@ -44,8 +43,8 @@ class EvalPipeline:
     def setModel(self, anchors, image_size):
         self.model = Yolo(self.dataset.n_classes, image_size, anchors)
 
-    def setDevice(self, use_gpu):
-        self.device = 'cuda' if use_gpu and cuda.is_available() else 'cpu'
+    def setDevice(self):
+        self.device = 'cuda'
 
     def setModelPath(self, model_path):
         self.model_path = Path(model_path)
@@ -67,9 +66,6 @@ class EvalPipeline:
 
     def setDataset(self, dataset):
         self.dataset = dataset
-
-    def setGpu(self, use_gpu):
-        self.use_gpu = use_gpu
 
     @torch.no_grad()
     def eval(self):
@@ -99,24 +95,20 @@ class EvalPipeline:
 
     def getResult(self, h, image_name, out, w):
         for c, pred in out[0].items():
-            pred = pred.numpy()
-            mask = pred[:, 0] > self.conf_thresh
-
+            mask, pred = self.setFactor(pred)
             if not mask.any():
                 continue
 
             bbox, conf = self.resultFilter(h, mask, pred, w)
-
             self.saveResult(bbox, c, conf, image_name)
+
+    def setFactor(self, pred):
+        pred = pred.numpy()
+        mask = pred[:, 0] > self.conf_thresh
+        return mask, pred
 
     def saveResult(self, bbox, c, conf, image_name):
         self.preds[self.dataset.VOC2007_classes[c]][image_name] = {"bbox": bbox.tolist(),"conf": conf.tolist()}
-
-    def resultFilter(self, h, mask, pred, w):
-        conf = self.calConf(mask, pred)
-        bbox = rescale_bbox(pred[:, 1:][mask], self.image_size, h, w)
-        bbox = center_to_corner_numpy(bbox)
-        return bbox, conf
 
     def calConf(self, mask, pred):
         conf = pred[:, 0][mask]
@@ -126,6 +118,12 @@ class EvalPipeline:
         x = transformer.transform(image).to(self.device)
         out = self.model.predict(x)
         return out
+
+    def resultFilter(self, h, mask, pred, w):
+        conf = self.calConf(mask, pred)
+        bbox = rescale_bbox(pred[:, 1:][mask], self.image_size, h, w)
+        bbox = center_to_corner_numpy(bbox)
+        return bbox, conf
 
     def setImageHW(self, image_path):
         image = np.array(Image.open(image_path).convert('RGB'))
@@ -150,11 +148,9 @@ class EvalPipeline:
 
     def gtLoop(self):
         for i, (anno_path, img_name) in enumerate(zip(self.dataset.annotationPaths, self.dataset.imageNames)):
-            print(f'\rRate of progress：{i / len(self.dataset):.0%}', end='')
-
             root = self.getRoot(anno_path)
-
             self.fetchObj(img_name, root)
+            print(f'\rRate of progress：{i / len(self.dataset):.0%}', end='')
 
     def fetchObj(self, img_name, root):
         for obj in root.iter('object'):
@@ -164,8 +160,8 @@ class EvalPipeline:
             self.addMark(bbox, c, difficult, img_name)
 
     def addMark(self, bbox, c, difficult, img_name):
-        self.ground_truths[c][img_name]['bbox'].append(bbox)
         self.ground_truths[c][img_name]['detected'].append(False)
+        self.ground_truths[c][img_name]['bbox'].append(bbox)
         self.ground_truths[c][img_name]['difficult'].append(difficult)
         self.calPosNum(c, difficult)
 
@@ -182,11 +178,7 @@ class EvalPipeline:
 
     def clearGt(self, c, img_name):
         if not self.ground_truths[c].get(img_name):
-            self.ground_truths[c][img_name] = {
-                "bbox": [],
-                "detected": [],
-                "difficult": []
-            }
+            self.ground_truths[c][img_name] = {"detected": [], "bbox": [], "difficult": []}
 
     def findBboxes(self, bbox):
         bbox = [int(bbox.find('xmin').text),int(bbox.find('ymin').text),int(bbox.find('xmax').text),int(bbox.find('ymax').text),]
@@ -291,10 +283,10 @@ class EvalPipeline:
             prec, rec = self.calPrec(precision, recall)
 
             for i in range(prec.size - 1, 0, -1):
-                prec[i - 1] = np.maximum(prec[i - 1], prec[i])
+                inde = np.maximum(prec[i - 1], prec[i])
+                prec[i - 1] = inde
 
             i = self.calIndex(i, rec)
-
             ap = self.calAp1(i, prec, rec)
         else:
             ap = 0
@@ -320,9 +312,13 @@ class EvalPipeline:
         return i
 
     def calPrec(self, precision, recall):
-        rec = np.concatenate(([0.], recall, [1.]))
+        rec = self.calRec(recall)
         prec = np.concatenate(([0.], precision, [0.]))
         return prec, rec
+
+    def calRec(self, recall):
+        rec = np.concatenate(([0.], recall, [1.]))
+        return rec
 
     def calPR(self, c, fp, tp):
         tp = tp.cumsum()
@@ -350,17 +346,17 @@ class EvalPipeline:
                 continue
 
             bbox_gt, bbox_pred = self.setBboxpg(bbox, i, record)
-
             iou_max, iou_max_index = self.calIOU(bbox_gt, bbox_pred)
 
             if iou_max < self.overlap_thresh:
                 fp[i] = 1
             elif not record['difficult'][iou_max_index]:
-                if not record['detected'][iou_max_index]:
+                if record['detected'][iou_max_index]:
+                    fp[i] = 1
+                else:
                     record['detected'][iou_max_index] = True
                     tp[i] = 1
-                else:
-                    fp[i] = 1
+
         return fp, tp
 
     def calIOU(self, bbox_gt, bbox_pred):
@@ -372,12 +368,15 @@ class EvalPipeline:
     def setBboxpg(self, bbox, i, record):
         bbox_pred = bbox[i]
         bbox_gt = np.array(record['bbox'])
-        difficult = np.array(record['difficult'], np.bool)
         return bbox_gt, bbox_pred
 
     def initP(self, image_names):
         tp = np.zeros(len(image_names))
         return tp
+
+    def bcAppend(self, bbox, conf, v):
+        bbox.append(v['bbox'])
+        conf.append(v['conf'])
 
     def sortBoxes(self, bbox, conf, image_names):
         index = np.argsort(-conf)
@@ -395,13 +394,13 @@ class EvalPipeline:
     def combineBoxes(self, bbox, conf, image_names, pred):
         for image_name, v in pred.items():
             image_names.extend([image_name] * len(v['conf']))
-            bbox.append(v['bbox'])
-            conf.append(v['conf'])
+            self.bcAppend(bbox, conf, v)
+
 
     def initParas(self, c):
-        pred = self.preds[c]
-        ground_truth = self.ground_truths[c]
         bbox = []
         conf = []
+        pred = self.preds[c]
+        ground_truth = self.ground_truths[c]
         image_names = []
         return bbox, conf, ground_truth, image_names, pred
