@@ -463,7 +463,7 @@ class Yolo(nn.Module):
         return image
 
     def boxPred(self, classes, h, w, y):
-        bbox, conf, label = []
+        bbox, conf, label = [], [], []
         for c, pred in y[0].items():
             pred = self.calcPred(bbox, h, pred, w)
             conf.extend(pred[:, 0].tolist())
