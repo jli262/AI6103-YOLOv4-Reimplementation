@@ -1,11 +1,12 @@
 # coding:utf-8
-from typing import Tuple, Dict, List
-import numpy as np
-
 import torch
-from utils.box_utils import decode, center_to_corner
 from torchvision.ops import nms
 
+from typing import Tuple, Dict, List
+
+from utils.box_utils import decode, center_to_corner
+
+import numpy as np
 
 class Detector:
     """ 探测器 """
