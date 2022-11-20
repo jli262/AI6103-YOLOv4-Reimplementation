@@ -15,14 +15,15 @@ from .detector import Detector
 
 
 class Mish(nn.Module):
-    """ Mish 激活函数 """
 
     def forward(self, x):
-        return x * torch.tanh(F.softplus(x))
+
+        y = x * torch.tanh(F.softplus(x))
+
+        return y
 
 
 class CBMBlock(nn.Module):
-    """ CBM 块 """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1):
         super().__init__()
