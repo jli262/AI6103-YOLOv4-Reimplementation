@@ -1,282 +1,407 @@
-# coding:utf-8
-import json
-from pathlib import Path
 from xml.etree import ElementTree as ET
-
-import numpy as np
-import torch
-from torch import cuda
-from PIL import Image
-from prettytable import PrettyTable
 from utils.box_utils import jaccard_overlap_numpy, center_to_corner_numpy, rescale_bbox
 from utils.augmentation_utils import ToTensor
+import numpy as np
+
+
+import json
+from pathlib import Path
 
 from .dataset import VOCDataset
 from .yolo import Yolo
-
+from PIL import Image
+from prettytable import PrettyTable
+import torch
+from torch import cuda
 
 class EvalPipeline:
-    """ 测试模型流水线 """
+    def __init__(self, model_path: str, dataset: VOCDataset, image_size=416, anchors: list = None, conf_thresh=0.05, overlap_thresh=0.5, save_dir='eval', use_07_metric=False, use_gpu=True):
+        self.setGpu(use_gpu)
+        self.setDataset(dataset)
+        self.setImageSize(image_size)
+        self.setConfThresh(conf_thresh)
+        self.setOverlapThresh(overlap_thresh)
+        self.set07Metric(use_07_metric)
+        self.setSaveDir(save_dir)
 
-    def __init__(self, model_path: str, dataset: VOCDataset, image_size=416, anchors: list = None,
-                 conf_thresh=0.05, overlap_thresh=0.5, save_dir='eval', use_07_metric=False, use_gpu=True):
-        """
-        Parameters
-        ----------
-        model_path: str
-            模型文件路径
+        self.setModelPath(model_path)
+        self.setDevice(use_gpu)
+        self.setModel(anchors, image_size)
+        self.setDConfThresh(conf_thresh)
+        self.setModelDevice()
+        self.setModelLoad(model_path)
+        self.model.eval()
 
-        dataset: VOCDataset
-            数据集
+    def setModelLoad(self, model_path):
+        self.model.load(model_path)
 
-        image_size: int
-            图像尺寸
+    def setModelDevice(self):
+        self.model = self.model.to(self.device)
 
-        anchors: list
-            输入神经网络的图像大小为 416 时对应的先验框
+    def setDConfThresh(self, conf_thresh):
+        self.model.detector.conf_thresh = conf_thresh
 
-        conf_thresh: float
-            置信度阈值
+    def setModel(self, anchors, image_size):
+        self.model = Yolo(self.dataset.n_classes, image_size, anchors)
 
-        overlap_thresh: float
-            IOU 阈值
+    def setDevice(self, use_gpu):
+        self.device = 'cuda' if use_gpu and cuda.is_available() else 'cpu'
 
-        save_dir: str
-            测试结果和预测结果文件的保存目录
+    def setModelPath(self, model_path):
+        self.model_path = Path(model_path)
 
-        use_07_metric: bool
-            是否使用 VOC2007 的 AP 计算方法
-
-        use_gpu: bool
-            是否使用 GPU
-        """
-        self.use_gpu = use_gpu
-        self.dataset = dataset
-        self.image_size = image_size
-        self.conf_thresh = conf_thresh
-        self.overlap_thresh = overlap_thresh
-        self.use_07_metric = use_07_metric
+    def setSaveDir(self, save_dir):
         self.save_dir = Path(save_dir)
 
-        self.model_path = Path(model_path)
-        self.device = 'cuda' if use_gpu and cuda.is_available() else 'cpu'
-        self.model = Yolo(self.dataset.n_classes, image_size, anchors)
-        self.model.detector.conf_thresh = conf_thresh
-        self.model = self.model.to(self.device)
-        self.model.load(model_path)
-        self.model.eval()
+    def set07Metric(self, use_07_metric):
+        self.use_07_metric = use_07_metric
+
+    def setOverlapThresh(self, overlap_thresh):
+        self.overlap_thresh = overlap_thresh
+
+    def setConfThresh(self, conf_thresh):
+        self.conf_thresh = conf_thresh
+
+    def setImageSize(self, image_size):
+        self.image_size = image_size
+
+    def setDataset(self, dataset):
+        self.dataset = dataset
+
+    def setGpu(self, use_gpu):
+        self.use_gpu = use_gpu
 
     @torch.no_grad()
     def eval(self):
-        """ 测试模型，获取 mAP """
         self._predict()
         self._get_ground_truth()
         return self._get_mAP()
 
     def _predict(self):
-        """ 预测每一种类存在于哪些图片中 """
-        self.preds = {c: {} for c in self.dataset.VOC2007_classes}
-        transformer = ToTensor(self.image_size)
 
-        print('🛸 正在预测中...')
+        self.setPreds()
+        transformer = self.setTrans()
+
+        print('In predicting...')
+        self.predLoop(transformer)
+
+    def predLoop(self, transformer):
         for i, (image_path, image_name) in enumerate(zip(self.dataset.imagePaths, self.dataset.imageNames)):
-            print(f'\r当前进度：{i/len(self.dataset):.0%}', end='')
+            print(f'\rRate of progress ：{i / len(self.dataset):.0%}', end='')
 
-            # 读入图片
-            image = np.array(Image.open(image_path).convert('RGB'))
-            h, w, _ = image.shape
+            h, image, w = self.setImageHW(image_path)
 
-            # 预测
-            x = transformer.transform(image).to(self.device)
-            out = self.model.predict(x)
+            out = self.getOutput(image, transformer)
             if not out:
                 continue
 
-            for c, pred in out[0].items():
-                pred = pred.numpy()
-                mask = pred[:, 0] > self.conf_thresh
+            self.getResult(h, image_name, out, w)
 
-                # 如果没有一个边界框的置信度大于阈值就纸条跳过这个类
-                if not mask.any():
-                    continue
+    def getResult(self, h, image_name, out, w):
+        for c, pred in out[0].items():
+            pred = pred.numpy()
+            mask = pred[:, 0] > self.conf_thresh
 
-                # 筛选出满足阈值条件的边界框
-                conf = pred[:, 0][mask]  # type:np.ndarray
-                bbox = rescale_bbox(pred[:, 1:][mask], self.image_size, h, w)
-                bbox = center_to_corner_numpy(bbox)
+            if not mask.any():
+                continue
 
-                # 保存预测结果
-                self.preds[self.dataset.VOC2007_classes[c]][image_name] = {
-                    "bbox": bbox.tolist(),
-                    "conf": conf.tolist()
-                }
+            bbox, conf = self.resultFilter(h, mask, pred, w)
+
+            self.saveResult(bbox, c, conf, image_name)
+
+    def saveResult(self, bbox, c, conf, image_name):
+        self.preds[self.dataset.VOC2007_classes[c]][image_name] = {"bbox": bbox.tolist(),"conf": conf.tolist()}
+
+    def resultFilter(self, h, mask, pred, w):
+        conf = self.calConf(mask, pred)
+        bbox = rescale_bbox(pred[:, 1:][mask], self.image_size, h, w)
+        bbox = center_to_corner_numpy(bbox)
+        return bbox, conf
+
+    def calConf(self, mask, pred):
+        conf = pred[:, 0][mask]
+        return conf
+
+    def getOutput(self, image, transformer):
+        x = transformer.transform(image).to(self.device)
+        out = self.model.predict(x)
+        return out
+
+    def setImageHW(self, image_path):
+        image = np.array(Image.open(image_path).convert('RGB'))
+        h, w, _ = image.shape
+        return h, image, w
+
+    def setTrans(self):
+        transformer = ToTensor(self.image_size)
+        return transformer
+
+    def setPreds(self):
+        self.preds = {c: {} for c in self.dataset.VOC2007_classes}
 
     def _get_ground_truth(self):
-        """ 获取 ground truth 中每一种类存在于哪些图片中 """
-        self.ground_truths = {c: {} for c in self.dataset.VOC2007_classes}
+
+        self.getGroundTruth()
+        self.getPositiveNums()
+
+        print('\n\nFetching labels...')
+
+        self.gtLoop()
+
+    def gtLoop(self):
+        for i, (anno_path, img_name) in enumerate(zip(self.dataset.annotationPaths, self.dataset.imageNames)):
+            print(f'\rRate of progress：{i / len(self.dataset):.0%}', end='')
+
+            root = self.getRoot(anno_path)
+
+            self.fetchObj(img_name, root)
+
+    def fetchObj(self, img_name, root):
+        for obj in root.iter('object'):
+
+            bbox, c, difficult = self.getLabelBox(img_name, obj)
+
+            self.addMark(bbox, c, difficult, img_name)
+
+    def addMark(self, bbox, c, difficult, img_name):
+        self.ground_truths[c][img_name]['bbox'].append(bbox)
+        self.ground_truths[c][img_name]['detected'].append(False)
+        self.ground_truths[c][img_name]['difficult'].append(difficult)
+        self.calPosNum(c, difficult)
+
+    def calPosNum(self, c, difficult):
+        self.n_positives[c] += (1 - difficult)
+
+    def getLabelBox(self, img_name, obj):
+        c = self.calC(obj)
+        difficult = self.setDifficult(obj)
+        bbox = self.findBbox(obj)
+        bbox = self.findBboxes(bbox)
+        self.clearGt(c, img_name)
+        return bbox, c, difficult
+
+    def clearGt(self, c, img_name):
+        if not self.ground_truths[c].get(img_name):
+            self.ground_truths[c][img_name] = {
+                "bbox": [],
+                "detected": [],
+                "difficult": []
+            }
+
+    def findBboxes(self, bbox):
+        bbox = [int(bbox.find('xmin').text),int(bbox.find('ymin').text),int(bbox.find('xmax').text),int(bbox.find('ymax').text),]
+        return bbox
+
+    def findBbox(self, obj):
+        bbox = obj.find('bndbox')
+        return bbox
+
+    def setDifficult(self, obj):
+        difficult = int(obj.find('difficult').text)
+        return difficult
+
+    def calC(self, obj):
+        c = obj.find('name').text.lower().strip()
+        return c
+
+    def getRoot(self, anno_path):
+        root = ET.parse(anno_path).getroot()
+        return root
+
+    def getPositiveNums(self):
         self.n_positives = {c: 0 for c in self.dataset.VOC2007_classes}
 
-        print('\n\n🧩 正在获取标签中...')
-        for i, (anno_path, img_name) in enumerate(zip(self.dataset.annotationPaths, self.dataset.imageNames)):
-            print(f'\r当前进度：{i/len(self.dataset):.0%}', end='')
-
-            root = ET.parse(anno_path).getroot()
-
-            for obj in root.iter('object'):
-                # 获取标签含有的的类和边界框
-                c = obj.find('name').text.lower().strip()
-                difficult = int(obj.find('difficult').text)
-                bbox = obj.find('bndbox')
-                bbox = [
-                    int(bbox.find('xmin').text),
-                    int(bbox.find('ymin').text),
-                    int(bbox.find('xmax').text),
-                    int(bbox.find('ymax').text),
-                ]
-
-                if not self.ground_truths[c].get(img_name):
-                    self.ground_truths[c][img_name] = {
-                        "bbox": [],
-                        "detected": [],
-                        "difficult": []
-                    }
-
-                # 添加一条 ground truth 记录
-                self.ground_truths[c][img_name]['bbox'].append(bbox)
-                self.ground_truths[c][img_name]['detected'].append(False)
-                self.ground_truths[c][img_name]['difficult'].append(difficult)
-                self.n_positives[c] += (1-difficult)
+    def getGroundTruth(self):
+        self.ground_truths = {c: {} for c in self.dataset.VOC2007_classes}
 
     def _get_mAP(self):
-        """ 计算 mAP """
         result = {}
 
-        print('\n\n🧪 正在计算 AP 中...')
-        mAP = 0
-        table = PrettyTable(["class", "AP"])
-        for c in self.dataset.VOC2007_classes:
-            ap, precision, recall = self._get_AP(c)
-            result[c] = {
-                'AP': ap,
-                'precision': precision,
-                'recall': recall
-            }
-            mAP += ap
-            table.add_row([c, f"{ap:.2%}"])
+        print('\n\nCalculating AP...')
+        mAP = self.mapObtain(result)
 
-        mAP /= len(self.dataset.VOC2007_classes)
-        table.add_column("mAP", [f"{mAP:.2%}"] + [""]*(len(self.dataset.VOC2007_classes)-1))
-        print(table)
-
-        # 保存评估结果
-        self.save_dir.mkdir(exist_ok=True, parents=True)
-        p = self.save_dir / (self.model_path.stem + '_AP.json')
-        with open(p, 'w', encoding='utf-8') as f:
-            json.dump(result, f)
+        self.saveResult0(result)
 
         return mAP
 
+    def saveResult0(self, result):
+        self.save_dir.mkdir(exist_ok=True, parents=True)
+        p = self.calDir()
+        self.importJson(p, result)
+
+    def importJson(self, p, result):
+        with open(p, 'w', encoding='utf-8') as f:
+            json.dump(result, f)
+
+    def calDir(self):
+        p = self.save_dir / (self.model_path.stem + '_AP.json')
+        return p
+
+    def mapObtain(self, result):
+        mAP = 0
+        mAP, table = self.generateTable(mAP, result)
+        mAP = self.calMap(mAP)
+        table.add_column("mAP", [f"{mAP:.2%}"] + [""] * (len(self.dataset.VOC2007_classes) - 1))
+        print(table)
+        return mAP
+
+    def calMap(self, mAP):
+        mAP /= len(self.dataset.VOC2007_classes)
+        return mAP
+
+    def generateTable(self, mAP, result):
+        table = self.setTable()
+        for c in self.dataset.VOC2007_classes:
+            ap, precision, recall = self._get_AP(c)
+            result[c] = {'AP': ap,'precision': precision,'recall': recall}
+            mAP = self.accuMAP(ap, mAP)
+            table.add_row([c, f"{ap:.2%}"])
+        return mAP, table
+
+    def accuMAP(self, ap, mAP):
+        mAP += ap
+        return mAP
+
+    def setTable(self):
+        table = PrettyTable(["class", "AP"])
+        return table
+
     def _get_AP(self, c: str):
-        """ 计算一个类的 AP
+        bbox, conf, ground_truth, image_names, pred = self.initParas(c)
 
-        Parameters
-        ----------
-        c: str
-            类别名
+        self.combineBoxes(bbox, conf, image_names, pred)
 
-        Returns
-        -------
-        ap: float
-            AP，没有预测出这个类就返回 0
+        if not bbox:
+            return 0, 0, 0
 
-        precision: list
-            查准率
+        bbox, conf, image_names = self.setParas(bbox, conf, image_names)
 
-        recall: list
-            查全率
-        """
+        bbox, image_names = self.sortBoxes(bbox, conf, image_names)
+
+        fp, tp = self.calTPFP(bbox, ground_truth, image_names)
+
+        precision, recall = self.calPR(c, fp, tp)
+
+        ap = self.calAPs(precision, recall)
+
+        return ap, precision.tolist(), recall.tolist()
+
+    def calAPs(self, precision, recall):
+        if not self.use_07_metric:
+            prec, rec = self.calPrec(precision, recall)
+
+            for i in range(prec.size - 1, 0, -1):
+                prec[i - 1] = np.maximum(prec[i - 1], prec[i])
+
+            i = self.calIndex(i, rec)
+
+            ap = self.calAp1(i, prec, rec)
+        else:
+            ap = 0
+            ap = self.calAp2(ap, precision, recall)
+        return ap
+
+    def calAp2(self, ap, precision, recall):
+        for r in np.arange(0, 1.1, 0.1):
+            if np.any(recall >= r):
+                ap = self.calAp3(ap, precision, r, recall)
+        return ap
+
+    def calAp3(self, ap, precision, r, recall):
+        ap += np.max(precision[recall >= r]) / 11
+        return ap
+
+    def calAp1(self, i, prec, rec):
+        ap = np.sum((rec[i + 1] - rec[i]) * prec[i + 1])
+        return ap
+
+    def calIndex(self, i, rec):
+        i = np.where(rec[1:] != rec[:-1])[0]
+        return i
+
+    def calPrec(self, precision, recall):
+        rec = np.concatenate(([0.], recall, [1.]))
+        prec = np.concatenate(([0.], precision, [0.]))
+        return prec, rec
+
+    def calPR(self, c, fp, tp):
+        tp = tp.cumsum()
+        fp = fp.cumsum()
+        n_positives = self.n_positives[c]
+        recall = self.calR(n_positives, tp)
+        precision = self.calP(fp, tp)
+        return precision, recall
+
+    def calP(self, fp, tp):
+        precision = tp / (tp + fp)
+        return precision
+
+    def calR(self, n_positives, tp):
+        recall = tp / n_positives
+        return recall
+
+    def calTPFP(self, bbox, ground_truth, image_names):
+        tp = self.initP(image_names)
+        fp = self.initP(image_names)
+        for i, image_name in enumerate(image_names):
+            record = ground_truth.get(image_name)
+            if not record:
+                fp[i] = 1
+                continue
+
+            bbox_gt, bbox_pred = self.setBboxpg(bbox, i, record)
+
+            iou_max, iou_max_index = self.calIOU(bbox_gt, bbox_pred)
+
+            if iou_max < self.overlap_thresh:
+                fp[i] = 1
+            elif not record['difficult'][iou_max_index]:
+                if not record['detected'][iou_max_index]:
+                    record['detected'][iou_max_index] = True
+                    tp[i] = 1
+                else:
+                    fp[i] = 1
+        return fp, tp
+
+    def calIOU(self, bbox_gt, bbox_pred):
+        iou = jaccard_overlap_numpy(bbox_pred, bbox_gt)
+        iou_max = iou.max()
+        iou_max_index = iou.argmax()
+        return iou_max, iou_max_index
+
+    def setBboxpg(self, bbox, i, record):
+        bbox_pred = bbox[i]
+        bbox_gt = np.array(record['bbox'])
+        difficult = np.array(record['difficult'], np.bool)
+        return bbox_gt, bbox_pred
+
+    def initP(self, image_names):
+        tp = np.zeros(len(image_names))
+        return tp
+
+    def sortBoxes(self, bbox, conf, image_names):
+        index = np.argsort(-conf)
+        bbox = bbox[index]
+        conf = conf[index]
+        image_names = image_names[index]
+        return bbox, image_names
+
+    def setParas(self, bbox, conf, image_names):
+        bbox = np.vstack(bbox)
+        conf = np.hstack(conf)
+        image_names = np.array(image_names)
+        return bbox, conf, image_names
+
+    def combineBoxes(self, bbox, conf, image_names, pred):
+        for image_name, v in pred.items():
+            image_names.extend([image_name] * len(v['conf']))
+            bbox.append(v['bbox'])
+            conf.append(v['conf'])
+
+    def initParas(self, c):
         pred = self.preds[c]
         ground_truth = self.ground_truths[c]
         bbox = []
         conf = []
         image_names = []
-
-        # 将 bbox 拼接为二维矩阵，每一行为一个预测框
-        for image_name, v in pred.items():
-            image_names.extend([image_name]*len(v['conf']))
-            bbox.append(v['bbox'])
-            conf.append(v['conf'])
-
-        # 没有在任何一张图片中预测出这个类
-        if not bbox:
-            return 0, 0, 0
-
-        bbox = np.vstack(bbox)  # type:np.ndarray
-        conf = np.hstack(conf)  # type:np.ndarray
-        image_names = np.array(image_names)
-
-        # 根据置信度降序排序预测框
-        index = np.argsort(-conf)
-        bbox = bbox[index]
-        conf = conf[index]
-        image_names = image_names[index]
-
-        # 计算 TP 和 FP
-        tp = np.zeros(len(image_names))  # type:np.ndarray
-        fp = np.zeros(len(image_names))  # type:np.ndarray
-        for i, image_name in enumerate(image_names):
-            # 获取一张图片中关于这个类的 ground truth
-            record = ground_truth.get(image_name)
-
-            # 这张图片的 ground_truth 中没有这个类就将 fp+1
-            if not record:
-                fp[i] = 1
-                continue
-
-            bbox_pred = bbox[i]  # shape:(4, )
-            bbox_gt = np.array(record['bbox'])  # shape:(n, 4)
-            difficult = np.array(record['difficult'], np.bool)  # shape:(n, )
-
-            # 计算交并比
-            iou = jaccard_overlap_numpy(bbox_pred, bbox_gt)
-            iou_max = iou.max()
-            iou_max_index = iou.argmax()
-
-            if iou_max < self.overlap_thresh:
-                fp[i] = 1
-            elif not record['difficult'][iou_max_index]:
-                # 已经匹配了预测框的边界框不能再匹配预测框
-                if not record['detected'][iou_max_index]:
-                    tp[i] = 1
-                    record['detected'][iou_max_index] = True
-                else:
-                    fp[i] = 1
-
-        # 查全率和查准率
-        tp = tp.cumsum()
-        fp = fp.cumsum()
-        n_positives = self.n_positives[c]
-        recall = tp / n_positives  # type:np.ndarray
-        precision = tp / (tp + fp)  # type:np.ndarray
-
-        # 计算 AP
-        if not self.use_07_metric:
-            rec = np.concatenate(([0.], recall, [1.]))
-            prec = np.concatenate(([0.], precision, [0.]))
-
-            # 计算 PR 曲线的包络线
-            for i in range(prec.size-1, 0, -1):
-                prec[i - 1] = np.maximum(prec[i - 1], prec[i])
-
-            # 找出 recall 变化时的索引
-            i = np.where(rec[1:] != rec[:-1])[0]
-
-            # 用recall的间隔对精度作加权平均
-            ap = np.sum((rec[i + 1] - rec[i]) * prec[i + 1])
-        else:
-            ap = 0
-            for r in np.arange(0, 1.1, 0.1):
-                if np.any(recall >= r):
-                    ap += np.max(precision[recall >= r])/11
-
-        return ap, precision.tolist(), recall.tolist()
+        return bbox, conf, ground_truth, image_names, pred
