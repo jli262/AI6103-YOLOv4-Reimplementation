@@ -18,7 +18,6 @@ from .detector import Detector
 class Mish(nn.Module):
 
     def forward(self, x):
-
         y = x * torch.tanh(F.softplus(x))
 
         return y
@@ -39,10 +38,10 @@ class CBMBlock(nn.Module):
         self.bn = nn.BatchNorm2d(out_channels)
 
     def setConvStruc(self, in_channels, kernel_size, out_channels, stride):
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=kernel_size // 2, bias=False)
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=kernel_size // 2,
+                              bias=False)
 
     def forward(self, x):
-
         return self.mish(self.bn(self.conv(x)))
 
 
@@ -53,7 +52,8 @@ class ResidualUnit(nn.Module):
         self.setBlock(hidden_channels, in_channels)
 
     def setBlock(self, hidden_channels, in_channels):
-        self.block = nn.Sequential(CBMBlock(in_channels, hidden_channels, 1), CBMBlock(hidden_channels, in_channels, 3), )
+        self.block = nn.Sequential(CBMBlock(in_channels, hidden_channels, 1),
+                                   CBMBlock(hidden_channels, in_channels, 3), )
 
     def setHChannel(self, hidden_channels, in_channels):
         hidden_channels = hidden_channels or in_channels
@@ -124,14 +124,15 @@ class ResidualBlock(nn.Module):
 
     def forward(self, x):
         x = self.downsample_conv(x)
-
-        x0 = self.split_conv0(x)
-
-        x1 = self.split_conv1(x)
+        x0, x1 = self.setSplit(x)
         x1 = self.blocks_conv(x1)
-
         x = torch.cat([x1, x0], dim=1)
         return self.concat_conv(x)
+
+    def setSplit(self, x):
+        x0 = self.split_conv0(x)
+        x1 = self.split_conv1(x)
+        return x0, x1
 
 
 class CSPDarkNet(nn.Module):
@@ -143,7 +144,10 @@ class CSPDarkNet(nn.Module):
         self.setStages(channels, layers)
 
     def setStages(self, channels, layers):
-        self.stages = nn.ModuleList([ResidualBlock(channels[i], channels[i + 1], layers[i]) for i in range(5)])
+        # Mlist = []
+        # for i in range(5):
+        #     Mlist.append((ResidualBlock(channels[i], channels[i + 1], layers[i])))
+        self.stages = nn.ModuleList([ResidualBlock(channels[i], channels[i+1], layers[i]) for i in range(5)])
 
     def setConv1(self):
         self.conv1 = CBMBlock(3, 32, 3)
@@ -158,25 +162,24 @@ class CSPDarkNet(nn.Module):
 
     def forward(self, x):
         x = self.setX(x)
-
-        x3, x4, x5 = self.getXs(x)
+        x3 = self.stages[2](x)
+        x4, x5 = self.getXs(x3)
 
         return x3, x4, x5
 
-    def getXs(self, x):
-        x3 = self.stages[2](x)
+    def getXs(self, x3):
         x4 = self.stages[3](x3)
         x5 = self.stages[4](x4)
-        return x3, x4, x5
+        return x4, x5
+
+    def load(self, model_path: Union[Path, str]):
+        self.load_state_dict(torch.load(model_path))
 
     def setX(self, x):
         x = self.conv1(x)
         x = self.stages[0](x)
         x = self.stages[1](x)
         return x
-
-    def load(self, model_path: Union[Path, str]):
-        self.load_state_dict(torch.load(model_path))
 
     def set_freezed(self, freeze: bool):
         for param in self.parameters():
@@ -197,7 +200,8 @@ class CBLBlock(nn.Module):
         self.bn = nn.BatchNorm2d(out_channels)
 
     def setConv(self, in_channels, kernel_size, out_channels, stride):
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=(kernel_size - 1) // 2, bias=False)
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=(kernel_size - 1) // 2,
+                              bias=False)
 
     def forward(self, x):
         return self.relu(self.bn(self.conv(x)))
@@ -209,10 +213,14 @@ class SPPBlock(nn.Module):
         self.setMaxpools(sizes)
 
     def setMaxpools(self, sizes):
+        # Mlist = {}
+        # for size in sizes:
+        #     Mlist = nn.MaxPool2d(size, 1, size // 2)
         self.maxpools = nn.ModuleList([nn.MaxPool2d(size, 1, size // 2) for size in sizes])
 
     def forward(self, x):
-        x1 = self.getX1(x)
+        if self.getX1(x):
+            x1 = self.getX1(x)
         x1.append(x)
         return torch.cat(x1, dim=1)
 
@@ -230,21 +238,26 @@ class Upsample(nn.Module):
         self.upsample = nn.Sequential(CBLBlock(in_channels, out_channels, 1), nn.Upsample(scale_factor=2, mode="nearest"))
 
     def forward(self, x):
-        return self.upsample(x)
+        if True:
+            x_back = self.upsample(x)
+        return x_back
 
 
 def make_three_cbl(channels: list):
-    cblss = nn.Sequential(CBLBlock(channels[0], channels[1], 1), CBLBlock(channels[1], channels[2], 3), CBLBlock(channels[2], channels[1], 1),)
+    cblss = nn.Sequential(CBLBlock(channels[0], channels[1], 1), CBLBlock(channels[1], channels[2], 3),
+                          CBLBlock(channels[2], channels[1], 1), )
     return cblss
 
 
 def make_five_cbl(channels: list):
-    cblsss = nn.Sequential(CBLBlock(channels[0], channels[1], 1), CBLBlock(channels[1], channels[2], 3), CBLBlock(channels[2], channels[1], 1), CBLBlock(channels[1], channels[2], 3), CBLBlock(channels[2], channels[1], 1),)
+    cblsss = nn.Sequential(CBLBlock(channels[0], channels[1], 1), CBLBlock(channels[1], channels[2], 3),
+                           CBLBlock(channels[2], channels[1], 1), CBLBlock(channels[1], channels[2], 3),
+                           CBLBlock(channels[2], channels[1], 1), )
     return cblsss
 
 
 def make_yolo_head(channels: list):
-    yolo_head = nn.Sequential(CBLBlock(channels[0], channels[1], 3), nn.Conv2d(channels[1], channels[2], 1),)
+    yolo_head = nn.Sequential(CBLBlock(channels[0], channels[1], 3), nn.Conv2d(channels[1], channels[2], 1), )
     return yolo_head
 
 
@@ -364,7 +377,8 @@ class Yolo(nn.Module):
         return anchors
 
     def setAnchors(self, anchors):
-        anchors = anchors or [[[142, 110], [192, 243], [459, 401]], [[36, 75], [76, 55], [72, 146]], [[12, 16], [19, 36], [40, 28]],]
+        anchors = anchors or [[[142, 110], [192, 243], [459, 401]], [[36, 75], [76, 55], [72, 146]],
+                              [[12, 16], [19, 36], [40, 28]], ]
         return anchors
 
     def img_size_judge(self, image_size):
@@ -411,24 +425,30 @@ class Yolo(nn.Module):
 
     def prepareParams(self, x):
         x2, x1, x0 = self.backbone(x)
-        P5 = self.conv2(self.SPP(self.conv1(x0)))
-        P5_upsample = self.upsample1(P5)
-        P4 = self.conv_for_P4(x1)
+        P4, P5, P5_upsample = self.setP(x0, x1)
         P4 = torch.cat([P4, P5_upsample], dim=1)
         P4 = self.make_five_conv1(P4)
         return P4, P5, x2
 
+    def setP(self, x0, x1):
+        P5 = self.conv2(self.SPP(self.conv1(x0)))
+        P5_upsample = self.upsample1(P5)
+        P4 = self.conv_for_P4(x1)
+        return P4, P5, P5_upsample
+
     @torch.no_grad()
     def predict(self, x: torch.Tensor):
-        return self.detector(self(x))
+        if self.detector:
+            x_detect = self.detector(self(x))
+        return x_detect
 
-    def detect(self, image: Union[str, np.ndarray], classes: List[str], use_gpu=True, show_conf=True) -> Image.Image:
+    def detect(self, image: Union[str, np.ndarray], classes: List[str], show_conf=True) -> Image.Image:
         image = self.pathDetect(image)
 
         h, w, channels = image.shape
         self.channelDetect(channels)
 
-        x = self.setX(image, use_gpu)
+        x = self.setX(image, True)
 
         y = self.predict(x)
         if not y:
@@ -443,18 +463,18 @@ class Yolo(nn.Module):
         return image
 
     def boxPred(self, classes, h, w, y):
-        bbox = []
-        conf = []
-        label = []
+        bbox, conf, label = []
         for c, pred in y[0].items():
-            pred = pred.numpy()
-
-            boxes = self.calBoxes(h, pred, w)
-            bbox.append(boxes)
-
+            pred = self.calcPred(bbox, h, pred, w)
             conf.extend(pred[:, 0].tolist())
             label.extend([classes[c]] * pred.shape[0])
         return bbox, conf, label
+
+    def calcPred(self, bbox, h, pred, w):
+        pred = pred.numpy()
+        boxes = self.calBoxes(h, pred.numpy(), w)
+        bbox.append(boxes)
+        return pred
 
     def calBoxes(self, h, pred, w):
         boxes = rescale_bbox(pred[:, 1:], self.image_size, h, w)
@@ -472,10 +492,11 @@ class Yolo(nn.Module):
 
     def pathDetect(self, image):
         if isinstance(image, str):
-            if os.path.exists(image):
+            convert = os.path.exists(image)
+            if convert:
                 image = np.array(Image.open(image).convert('RGB'))
             else:
-                raise FileNotFoundError("Image Path Error!")
+                raise FileNotFoundError("Image Path Error")
         return image
 
     def load(self, model_path: Union[Path, str]):
