@@ -39,18 +39,7 @@ class CBMBlock(nn.Module):
         self.mish = Mish()
 
     def forward(self, x):
-        """ 前馈
 
-        Parameters
-        ----------
-        x: Tensor of shape `(N, in_channels, H, W)`
-            输入
-
-        Returns
-        -------
-        y: Tensor of shape `(N, out_channels, H, W)`
-            输出
-        """
         return self.mish(self.bn(self.conv(x)))
 
 
