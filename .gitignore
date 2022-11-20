@@ -18,4 +18,6 @@ model/
 
 eval/
 
+.idea/
+
 .ipynb_checkpoints/
