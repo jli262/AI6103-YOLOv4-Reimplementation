@@ -5,7 +5,9 @@ from pathlib import Path
 from typing import List
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from net import EvalPipeline, VOCDataset, Yolo
+from net.eval_pipeline import EvalPipeline
+from net.dataset import VOCDataset
+from net.yolo import Yolo
 
 mpl.rc_file('resource/theme/matlab.mplstyle')
 

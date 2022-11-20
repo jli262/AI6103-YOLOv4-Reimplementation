@@ -1,5 +1,5 @@
-# coding:utf-8
-from net import TrainPipeline, VOCDataset
+from net.train_pipeline import TrainPipeline
+from net.dataset import VOCDataset
 from utils.augmentation_utils import YoloAugmentation, ColorAugmentation
 
 anchor = [[[142, 110], [192, 243], [459, 401]], [[36, 75], [76, 55], [72, 146]], [[12, 16], [19, 36], [40, 28]],]
