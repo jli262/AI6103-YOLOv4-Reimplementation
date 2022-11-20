@@ -83,7 +83,6 @@ The trained model on VOC2007 dataset and the mAP curse is shown in the figure be
 |tvmonitor | 72.27% |
 
 
-
 ## Detection Image
 
 ![Detection Image](resultSample1.png)
