@@ -46,7 +46,7 @@ class Detector:
     def getOutArray(self, batch_pred):
         out = []
         for pred in batch_pred:
-            pred[:, 5:] = pred[:, 5:] * pred[:, 4:5]
+            pred[:, 5:] = self.calculatePred(pred)
 
             c, conf = self.getPredConf(pred)
             pred = self.precessPred(c, conf, pred)
@@ -62,20 +62,35 @@ class Detector:
             out.append(detections)
         return out
 
+    def calculatePred(self, pred):
+        return pred[:, 5:] * pred[:, 4:5]
+
     def setDetections(self, classes_pred, pred):
         detections = {}
         for c in classes_pred:
             boxes, scores = self.getParas(c, pred)
-            keep = nms(center_to_corner(boxes), scores, self.nms_thresh)
+            keep = self.calculateKeep(boxes, scores)
             detections[int(c)] = torch.cat(
                 (scores[keep].unsqueeze(1), boxes[keep]), dim=1)
         return detections
 
+    def calculateKeep(self, boxes, scores):
+        keep = nms(center_to_corner(boxes), scores, self.nms_thresh)
+        return keep
+
     def getParas(self, c, pred):
         mask = pred[:, -1] == c
-        boxes = pred[:, :4][mask]
-        scores = pred[:, 4][mask]
+        boxes = self.calculateBox(mask, pred)
+        scores = self.calculateScore(mask, pred)
         return boxes, scores
+
+    def calculateScore(self, mask, pred):
+        scores = pred[:, 4][mask]
+        return scores
+
+    def calculateBox(self, mask, pred):
+        boxes = pred[:, :4][mask]
+        return boxes
 
     def getPredClass(self, pred):
         classes_pred = pred[:, -1].unique()
@@ -94,12 +109,10 @@ class Detector:
         return c, conf
 
     def getPredBatch(self, N, preds):
-        # 解码
         batch_pred = []
         for pred, anchors in zip(preds, self.anchors):
             pred_ = decode(pred, anchors, self.n_classes, self.image_size)
 
-            # 展平预测框，shape: (N, n_anchors*H*W, n_classes+5)
             batch_pred.append(pred_.view(N, -1, self.n_classes + 5))
         batch_pred = torch.cat(batch_pred, dim=1)
         return batch_pred
