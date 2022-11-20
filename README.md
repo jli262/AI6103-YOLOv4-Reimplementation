@@ -59,7 +59,30 @@ The trained model on VOC2007 dataset and the mAP curse is shown in the figure be
 
 ### best mAP
 
-![mAP](map.png)
+| Class | AP | mAP |
+| :----: | :----: | :----: |
+| aeroplane | 71.42% | 70.54%|
+|bicycle | 84.71% | 
+| bird | 74.05% | 
+|boat | 50.76% | 
+|bottle | 59.52% | 
+|bus | 82.31% | 
+|car | 90.21% | 
+|cat | 84.73% | 
+|chair | 59.88% | 
+|cow | 60.25% | 
+|diningtable | 58.80%| 
+|dog | 81.90% |
+|horse | 85.75% |
+|motorbike | 80.61% |
+|person | 86.49% |
+|pottedplant | 41.80% |
+|sheep | 30.83% |
+|sofa | 69.42% |
+|train | 85.11% |
+|tvmonitor | 72.27% |
+
+
 
 ## Detection
 
