@@ -64,7 +64,7 @@ class YoloLoss(nn.Module):
         anchor_mask = list(
             range(index*self.n_anchors, (index+1)*self.n_anchors))
         pred = decode(pred, self.anchors[anchor_mask],
-                      self.n_classes, self.image_size, False)
+                      self.n_classes, self.image_size)
 
         step_h = self.calculateHW(h)
         step_w = self.calculateHW(w)
