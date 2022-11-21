@@ -431,16 +431,10 @@ class Yolo(nn.Module):
         return P4, P5, x2
 
     def setP(self, x0, x1):
+        P4 = self.conv_for_P4(x1)
         P5 = self.conv2(self.SPP(self.conv1(x0)))
         P5_upsample = self.upsample1(P5)
-        P4 = self.conv_for_P4(x1)
         return P4, P5, P5_upsample
-
-    @torch.no_grad()
-    def predict(self, x: torch.Tensor):
-        if self.detector:
-            x_detect = self.detector(self(x))
-        return x_detect
 
     def detect(self, image: Union[str, np.ndarray], classes: List[str], show_conf=True) -> Image.Image:
         image = self.pathDetect(image)
@@ -461,6 +455,12 @@ class Yolo(nn.Module):
 
         image = draw(image, np.vstack(bbox), label, conf)
         return image
+
+    @torch.no_grad()
+    def predict(self, x: torch.Tensor):
+        if self.detector:
+            x_detect = self.detector(self(x))
+        return x_detect
 
     def boxPred(self, classes, h, w, y):
         bbox, conf, label = [],[],[]
