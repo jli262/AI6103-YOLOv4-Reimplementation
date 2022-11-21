@@ -135,7 +135,7 @@ class TrainPipeline:
         self.optimizer = make_optimizer(self.model, lr_fit, momentum, weight_decay)
 
     def setCriterion(self, anchors, image_size, n_classes):
-        self.criterion = YoloLoss(anchors, n_classes, image_size)
+        self.criterion = YoloLoss(anchors, n_classes)
 
     def setbs(self, batch_size, freeze, freeze_batch_size):
         bs = freeze_batch_size if freeze else batch_size

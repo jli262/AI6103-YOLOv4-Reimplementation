@@ -9,18 +9,18 @@ import numpy as np
 class YoloLoss(nn.Module):
 
 
-    def __init__(self, anchors: list, n_classes: int, image_size: int, overlap_thresh=0.5):
+    def __init__(self, anchors: list, n_classes: int,overlap_thresh=0.5):
 
         super().__init__()
         self.setAnchorsNum(anchors)
         self.setAnchors(anchors)
         self.setClassNum(n_classes)
-        self.setImageSize(image_size)
+        self.setImageSize(416)
         self.setOverlapThresh(overlap_thresh)
 
         self.setBalances()
         self.setLambdaBox()
-        self.setLambdaObj(image_size)
+        self.setLambdaObj(416)
         self.setLambdaCls(n_classes)
 
         self.setBceLoss()
