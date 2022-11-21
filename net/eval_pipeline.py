@@ -15,18 +15,18 @@ import torch
 from torch import cuda
 
 class EvalPipeline:
-    def __init__(self, model_path: str, dataset: VOCDataset, image_size=416, anchors: list = None, conf_thresh=0.05, overlap_thresh=0.5, save_dir='eval', use_07_metric=False):
+    def __init__(self, model_path: str, dataset: VOCDataset, anchors: list = None, conf_thresh=0.05,  use_07_metric=False):
         self.setDevice()
 
         self.setDataset(dataset)
-        self.setImageSize(image_size)
+        self.setImageSize(416)
         self.setConfThresh(conf_thresh)
 
-        self.setOverlapThresh(overlap_thresh)
+        self.setOverlapThresh()
         self.set07Metric(use_07_metric)
-        self.setSaveDir(save_dir)
+        self.setSaveDir()
         self.setModelPath(model_path)
-        self.setModel(anchors, image_size)
+        self.setModel(anchors, 416)
         self.setDConfThresh(conf_thresh)
         self.setModelDevice()
         self.setModelLoad(model_path)
@@ -49,14 +49,14 @@ class EvalPipeline:
     def setModelPath(self, model_path):
         self.model_path = Path(model_path)
 
-    def setSaveDir(self, save_dir):
-        self.save_dir = Path(save_dir)
+    def setSaveDir(self):
+        self.save_dir = 'eval'
 
     def set07Metric(self, use_07_metric):
         self.use_07_metric = use_07_metric
 
-    def setOverlapThresh(self, overlap_thresh):
-        self.overlap_thresh = overlap_thresh
+    def setOverlapThresh(self):
+        self.overlap_thresh = 0.5
 
     def setConfThresh(self, conf_thresh):
         self.conf_thresh = conf_thresh
