@@ -16,18 +16,20 @@ Group Members: Ge Wenyue, Li Jiayi, Sun Jialiang, Yang Zhuochen, Zhu Qiankun
    pip install -r requirements.txt
    ```
 
-## Train
+## Training Steps
 
-1. Download VOC2007 dataset from following website and unzip them:
+1. Download VOC2007 dataset from following websites and unzip them:
 
    - http://pjreddie.com/media/files/VOCtest_06-Nov-2007.tar
    - http://pjreddie.com/media/files/VOCtrainval_06-Nov-2007.tar
 
-2. Download pre-trained `CSPDarknet53.pth` model from our [Google Drive](https://drive.google.com/file/d/1xqj_yx1Y_jz_UPHzzgNfNAcADtQSbDII/view?usp=share_link).
+2. Download pre-trained `CSPDarknet53.pth` model from our [Google Drive](https://drive.google.com/file/d/1xqj_yx1Y_jz_UPHzzgNfNAcADtQSbDII/view?usp=share_link) and save in the root folder.
 
 3. Directory structure is as follows:
 
    ```txt
+   train.py
+   evals.py
    VOC2007_train (VOC2007_test)
    ├───Annotations
    ├───ImageSets
