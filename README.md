@@ -59,7 +59,7 @@ python evals.py
 
 The trained model on VOC2007 dataset and the mAP curse is shown in the figure below (May Modify the `model_path` and `image_path`in evals.py first):
 
-![mAP Curve](mAP_Curve.png)
+![mAP Curve](output/mAP_Curve.png)
 
 ### best mAP
 
@@ -88,4 +88,4 @@ The trained model on VOC2007 dataset and the mAP curse is shown in the figure be
 
 ## Detection Image
 
-![Detection Image](resultSample1.png)
+![Detection Image](output/resultSample1.png)
