@@ -1,6 +1,6 @@
 # AI6103-YOLOv4-Reimplementaion
 
-AI6103 Group Project - Reimplementation of YOLOv4 object detection
+AI6103 Group Project - Reimplementation of YOLOv4 Object Detection Algorithm
 
 This is the code reimplementation of YOLOv4 object detection for the AI6103 group project of MSAI in Nanyang Technological University.
 
