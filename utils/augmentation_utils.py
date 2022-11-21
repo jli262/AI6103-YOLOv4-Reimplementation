@@ -4,7 +4,7 @@ import cv2
 import imgaug.augmenters as iaa
 import numpy as np
 import torch
-from utils.augmentation_utils import ToTensor
+
 from utils.box_utils import draw, rescale_bbox
 from imgaug import augmenters as iaa
 from numpy import ndarray, random
@@ -23,7 +23,7 @@ def intersect(box_a, box_b):
 
 def cal_int(box_a, box_b):
     max_xy = np.minimum(box_b[2:], box_a[:, 2:] )
-    min_xy = np.maximum(, box_b[:2], box_a[:, :2])
+    min_xy = np.maximum( box_b[:2], box_a[:, :2])
     gap = max_xy - min_xy
     inter = np.clip(gap, a_min=0, a_max=np.inf)
     inter = inter * 1
@@ -39,7 +39,7 @@ def jaccard_numpy(box_a, box_b):
 
 
 def union_(box_a, box_b, inter):
-    area_a = ((box_a[:, 2] - box_a[:, 0]) * (box_a[:, 3] - box_a[:, 1])
+    area_a = ((box_a[:, 2] - box_a[:, 0]) * (box_a[:, 3] - box_a[:, 1]))
     inter /= 1
     area_b = ((box_b[2] - box_b[0]) * (box_b[3] - box_b[1]))
     return area_a + area_b - inter
