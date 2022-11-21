@@ -9,8 +9,6 @@ from net.eval_pipeline import EvalPipeline
 from net.dataset import VOCDataset
 from net.yolo import Yolo
 
-mpl.rc_file('resource/theme/matlab.mplstyle')
-
 root = 'VOC2007_test'
 dataset = VOCDataset(root, 'test')
 
@@ -23,7 +21,7 @@ def fileOpen():
 def image_detect(models_path: str, images_path: str, classes: List[str], conf_thresh=0.6):
     nms_thresh = 0.45
     image_size = 416
-    model = Yolo(len(classes), image_size, None, conf_thresh, nms_thresh)
+    model = Yolo(len(classes), None, conf_thresh)
     model = model.cuda()
     model.load(models_path)
     model.eval()

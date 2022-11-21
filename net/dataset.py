@@ -17,9 +17,9 @@ class VOCDataset(Dataset):
         'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair','cow', 'diningtable', 'dog', 'horse','motorbike', 'person', 'pottedplant','sheep', 'sofa', 'train', 'tvmonitor'
     ]
 
-    def __init__(self, root: Union[str, List[str]], imageSet: Union[str, List[str]],
-                 transformer: Transformer = None, colorTransformer: Transformer = None, keepDifficult=False,
-                 ifMosaic=False, ifMixup=False, imageSize=416):
+    def __init__(self, root: Union[str, List[str]], imageSet: Union[str, List[str]], keepDifficult=False,
+                 colorTransformer: Transformer = None,
+                 ifMosaic=False, ifMixup=False, transformer: Transformer = None):
         
         super().__init__()
 
@@ -33,7 +33,7 @@ class VOCDataset(Dataset):
 
         self.setImageSet(imageSet)
 
-        self.setImageSize(imageSize)
+        self.setImageSize()
 
         self.setIfMosaic(ifMosaic)
 
@@ -95,8 +95,8 @@ class VOCDataset(Dataset):
     def setIfMosaic(self, ifMosaic):
         self.ifMosaic = ifMosaic
 
-    def setImageSize(self, imageSize):
-        self.imageSize = imageSize
+    def setImageSize(self):
+        self.imageSize = 416
 
     def setImageSet(self, imageSet):
         self.imageSet = imageSet

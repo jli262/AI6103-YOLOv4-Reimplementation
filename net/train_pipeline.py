@@ -150,7 +150,7 @@ class TrainPipeline:
             print('Successfully loading YOLO：' + yolo_path)
 
     def setModel(self, anchors, image_size, n_classes):
-        self.model = Yolo(n_classes, image_size, anchors).to(self.device)
+        self.model = Yolo(n_classes, anchors).to(self.device)
 
     def setGPUDevice(self):
 

@@ -262,18 +262,18 @@ def make_yolo_head(channels: list):
 
 
 class Yolo(nn.Module):
-    def __init__(self, n_classes, image_size=416, anchors: list = None, conf_thresh=0.1, nms_thresh=0.45):
+    def __init__(self, n_classes, anchors: list = None, conf_thresh=0.1, nms_thresh=0.45):
         super().__init__()
-        self.img_size_judge(image_size)
+        self.img_size_judge(416)
 
         anchors = self.setAnchors(anchors)
 
-        anchors = self.calAnchors(anchors, image_size)
+        anchors = self.calAnchors(anchors, 416)
 
         self.setSelfAnchors(anchors)
 
         self.setClassNum(n_classes)
-        self.setImageSize(image_size)
+        self.setImageSize(416)
 
         self.setBackbone()
 
@@ -302,7 +302,7 @@ class Yolo(nn.Module):
 
         self.setYoloHead1(channel)
 
-        self.setDetector(conf_thresh, image_size, n_classes, nms_thresh)
+        self.setDetector(conf_thresh, 416, n_classes, nms_thresh)
 
     def setDetector(self, conf_thresh, image_size, n_classes, nms_thresh):
         self.detector = Detector(self.anchors, image_size, n_classes, conf_thresh, nms_thresh)
@@ -465,7 +465,7 @@ class Yolo(nn.Module):
     def boxPred(self, classes, h, w, y):
         bbox, conf, label = [],[],[]
         for c, pred in y[0].items():
-            boxes = rescale_bbox(pred[:, 1:], self.image_size, h, w)
+            boxes = rescale_bbox(pred[:, 1:], 416, h, w)
             bbox.append(boxes)
             conf.extend(pred[:, 0].tolist())
             label.extend([classes[c]] * pred.shape[0])
@@ -478,11 +478,11 @@ class Yolo(nn.Module):
         return pred
 
     def calBoxes(self, h, pred, w):
-        boxes = rescale_bbox(pred[:, 1:], self.image_size, h, w)
+        boxes = rescale_bbox(pred[:, 1:], 416, h, w)
         return boxes
 
     def setX(self, image, use_gpu):
-        x = ToTensor(self.image_size).transform(image)
+        x = ToTensor(416).transform(image)
         if use_gpu:
             x = x.cuda()
         return x

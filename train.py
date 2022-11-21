@@ -30,12 +30,11 @@ def datasetDefine(root):
     dataset = VOCDataset(
         root,
         'train',
-        transformer=YoloAugmentation(config['image_size']),
-        colorTransformer=ColorAugmentation(config['image_size']),
-        keepDifficult=True,
-        ifMosaic=True,
+        transformer=YoloAugmentation(416),
         ifMixup=True,
-        imageSize=config["image_size"]
+        ifMosaic=True,
+        colorTransformer=ColorAugmentation(416),
+        keepDifficult=True
     )
 
 

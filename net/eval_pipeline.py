@@ -41,7 +41,7 @@ class EvalPipeline:
         self.model.detector.conf_thresh = conf_thresh
 
     def setModel(self, anchors, image_size):
-        self.model = Yolo(self.dataset.n_classes, image_size, anchors)
+        self.model = Yolo(self.dataset.n_classes, anchors)
 
     def setDevice(self):
         self.device = 'cuda'

@@ -6,9 +6,9 @@ from imutils.video import FPS, WebcamVideoStream
 from net.yolo import Yolo
 
 
-def image_detect(model_path: str, image_path: str, classes: List[str], image_size=416,
-                 anchors=None, conf_thresh=0.6, nms_thresh=0.45, use_gpu=True, show_conf=True):
-    model = Yolo(len(classes), image_size, anchors, conf_thresh, nms_thresh)
+def image_detect(model_path: str, image_path: str, classes: List[str],
+                 anchors=None, conf_thresh=0.6, use_gpu=True, show_conf=True):
+    model = Yolo(len(classes), anchors, conf_thresh)
     if use_gpu:
         model = model.cuda()
 
@@ -18,9 +18,9 @@ def image_detect(model_path: str, image_path: str, classes: List[str], image_siz
     return model.detect(image_path, classes,  show_conf)
 
 
-def camera_detect(model_path: str, classes: List[str], image_size: int = 416, anchors: list = None,
-                  camera_src=0, conf_thresh=0.6, nms_thresh=0.45, use_gpu=True):
-    model = Yolo(len(classes), image_size, anchors, conf_thresh, nms_thresh)
+def camera_detect(model_path: str, classes: List[str], anchors: list = None,
+                  camera_src=0, conf_thresh=0.6, use_gpu=True):
+    model = Yolo(len(classes), anchors, conf_thresh)
     if use_gpu:
         model = model.cuda()
 
