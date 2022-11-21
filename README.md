@@ -6,7 +6,7 @@ This is the code reimplementation of YOLOv4 object detection for the AI6103 grou
 
 Group Members: Ge Wenyue, Li Jiayi, Sun Jialiang, Yang Zhuochen, Zhu Qiankun
 
-## Environment setting
+## Environment Setting
 
 1. Create virtual environment:
 
@@ -55,13 +55,13 @@ Calculate and plot mAP:
 python evals.py
 ```
 
-### mAP curve
+### mAP Plot
 
 The trained model on VOC2007 dataset and the mAP curse is shown in the figure below (May Modify the `model_path` and `image_path`in evals.py first):
 
 ![mAP Curve](output/mAP_Curve.png)
 
-### best mAP
+### mAP Result
 
 |    Class    |   AP   |  mAP   |
 | :---------: | :----: | :----: |
@@ -86,6 +86,6 @@ The trained model on VOC2007 dataset and the mAP curse is shown in the figure be
 |    train    | 85.11% |
 |  tvmonitor  | 72.27% |
 
-## Detection Image
+## Sample Result
 
 ![Detection Image](output/resultSample1.png)
