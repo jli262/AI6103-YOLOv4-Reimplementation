@@ -30,11 +30,12 @@ Group Members: Ge Wenyue, Li Jiayi, Sun Jialiang, Yang Zhuochen, Zhu Qiankun
    ```txt
    train.py
    evals.py
+   CSPDarknet53.pth
    VOC2007_train (VOC2007_test)
    ├───Annotations
    ├───ImageSets
-   │   ├───Layout
    │   ├───Main
+   │   ├───Layout
    │   └───Segmentation
    ├───JPEGImages
    ├───SegmentationClass
