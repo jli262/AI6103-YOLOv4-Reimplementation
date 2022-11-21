@@ -16,10 +16,10 @@ AI6103 Group Project - Reimplementation of YOLOv4 object detection
 
 1. Download VOC2007 dataset from following website and unzip them:
 
-   - http://pjreddie.com/media/files/VOCtrainval_06-Nov-2007.tar
    - http://pjreddie.com/media/files/VOCtest_06-Nov-2007.tar
+   - http://pjreddie.com/media/files/VOCtrainval_06-Nov-2007.tar
 
-2. Download pre-trained `CSPDarknet53.pth` model from [Google Drive](https://drive.google.com/file/d/1xqj_yx1Y_jz_UPHzzgNfNAcADtQSbDII/view?usp=share_link).
+2. Download pre-trained `CSPDarknet53.pth` model from our [Google Drive](https://drive.google.com/file/d/1xqj_yx1Y_jz_UPHzzgNfNAcADtQSbDII/view?usp=share_link).
 
 3. Directory structure is as follows:
 
@@ -35,10 +35,9 @@ AI6103 Group Project - Reimplementation of YOLOv4 object detection
    └───SegmentationObject
    ```
 
-4. start training:
+4. Start training:
 
    ```shell
-   conda activate yolov4
    python train.py
    ```
 
@@ -47,7 +46,6 @@ AI6103 Group Project - Reimplementation of YOLOv4 object detection
 Calculate and plot mAP:
 
 ```shell
-conda activate yolov4
 python evals.py
 ```
 
@@ -81,7 +79,6 @@ The trained model on VOC2007 dataset and the mAP curse is shown in the figure be
 |sofa | 69.42% |
 |train | 85.11% |
 |tvmonitor | 72.27% |
-
 
 
 ## Detection Image
