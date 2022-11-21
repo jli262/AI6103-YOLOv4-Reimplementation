@@ -9,8 +9,6 @@ from utils.box_utils import decode, center_to_corner
 import numpy as np
 
 class Detector:
-    """ 探测器 """
-
     def __init__(self, anchors: list, image_size: int, n_classes: int, conf_thresh=0.25, nms_thresh=0.45):
 
         self.setAnchors(anchors)
